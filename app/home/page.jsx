@@ -65,7 +65,7 @@ export default function HomePage() {
 
         <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1 rounded-full text-xs text-zinc-300">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          <span>0.0.0.0:3000 Aktif</span>
+          <span>0.0.0.0:23504 Aktif</span>
         </div>
       </header>
 
