@@ -75,18 +75,6 @@ export default function CustomPlayer({
     }, 3500);
   }, [showSettingsMenu, showRemoteHelp]);
 
-  // Boşluğa / Video Alanına Tıklandığında Medya Tuşlarını Göster / Gizle
-  const handleBackgroundClick = (e) => {
-    if (showControls) {
-      setShowControls(false);
-      setShowSettingsMenu(false);
-      setShowRemoteHelp(false);
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    } else {
-      showControlsTemporarily();
-    }
-  };
-
   // Hls.js başlatma & Kaldığı Yerden Devam Etme
   useEffect(() => {
     const video = videoRef.current;
@@ -244,24 +232,19 @@ export default function CustomPlayer({
     };
   }, []);
 
-  // Oynat / Durdur Buton Fonksiyonu
-  const togglePlay = useCallback((e) => {
-    if (e) e.stopPropagation();
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      video.play().catch(() => {});
+      video.play();
       showToast('▶ Oynatılıyor');
-      setIsPlaying(true);
     } else {
       video.pause();
       showToast('⏸ Duraklatıldı');
-      setIsPlaying(false);
     }
   }, [showToast]);
 
-  const seek = useCallback((seconds, e) => {
-    if (e) e.stopPropagation();
+  const seek = useCallback((seconds) => {
     const video = videoRef.current;
     if (!video) return;
     const nextTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + seconds));
@@ -269,8 +252,7 @@ export default function CustomPlayer({
     showToast(`${seconds > 0 ? `+${seconds}sn İleri` : `${seconds}sn Geri`} (${formatTime(nextTime)})`);
   }, [showToast]);
 
-  const toggleNativeFullscreen = useCallback(async (e) => {
-    if (e) e.stopPropagation();
+  const toggleNativeFullscreen = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
 
@@ -303,7 +285,9 @@ export default function CustomPlayer({
         } else if (screen.msLockOrientation) {
           screen.msLockOrientation('landscape');
         }
-      } catch (err) {}
+      } catch (e) {
+        // Bazı tarayıcılar yön kilitlemeye izin vermezse sessizce devam et
+      }
     } else {
       try {
         if (document.exitFullscreen) {
@@ -326,7 +310,7 @@ export default function CustomPlayer({
         } else if (screen.unlockOrientation) {
           screen.unlockOrientation();
         }
-      } catch (err) {}
+      } catch (e) {}
     }
   }, [showToast]);
 
@@ -358,15 +342,19 @@ export default function CustomPlayer({
 
       // --- 1. SMART TV KUMANDASI NUMARA TUŞLARI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9) ---
       if (key === '5') {
+        // 5: Oynat / Duraklat (Merkez Tuş)
         e.preventDefault();
         togglePlay();
       } else if (key === '4') {
+        // 4: 10sn Geri Sar (Sol)
         e.preventDefault();
         seek(-10);
       } else if (key === '6') {
+        // 6: 10sn İleri Sar (Sağ)
         e.preventDefault();
         seek(10);
       } else if (key === '8') {
+        // 8: Ses Aç (+10%) (Yukarı)
         e.preventDefault();
         const newVol = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
         video.volume = newVol;
@@ -374,23 +362,28 @@ export default function CustomPlayer({
         setIsMuted(false);
         showToast(`🔊 Ses: %${Math.round(newVol * 100)}`);
       } else if (key === '2') {
+        // 2: Ses Kıs (-10%) (Aşağı)
         e.preventDefault();
         const newVol = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
         video.volume = newVol;
         setVolume(newVol);
         showToast(`🔉 Ses: %${Math.round(newVol * 100)}`);
       } else if (key === '0') {
+        // 0: Tam Ekran Modu (Fullscreen)
         e.preventDefault();
         toggleNativeFullscreen();
       } else if (key === '7') {
+        // 7: Ses Dili Değiştir (Dual Audio: Türkçe ⇄ İngilizce)
         e.preventDefault();
         toggleAudioTrack();
       } else if (key === '9') {
+        // 9: Sesi Kapat / Aç (Mute)
         e.preventDefault();
         video.muted = !video.muted;
         setIsMuted(video.muted);
         showToast(video.muted ? '🔇 Ses Kapatıldı' : '🔊 Ses Açıldı');
       } else if (key === '1') {
+        // 1: Önceki Bölüm
         e.preventDefault();
         if (hasPrev && onPrevEpisode) {
           showToast('◀ Önceki Bölüme Geçiliyor...');
@@ -399,6 +392,7 @@ export default function CustomPlayer({
           showToast('İlk bölümdesiniz');
         }
       } else if (key === '3') {
+        // 3: Sonraki Bölüm
         e.preventDefault();
         if (hasNext && onNextEpisode) {
           showToast('Sonraki Bölüme Geçiliyor ▶');
@@ -450,7 +444,6 @@ export default function CustomPlayer({
   }, [showControlsTemporarily, togglePlay, seek, toggleNativeFullscreen, toggleAudioTrack, hasNext, hasPrev, onNextEpisode, onPrevEpisode, showToast]);
 
   const handleScrub = (e) => {
-    e.stopPropagation();
     const video = videoRef.current;
     if (!video || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -458,8 +451,7 @@ export default function CustomPlayer({
     video.currentTime = Math.max(0, Math.min(duration, pos * duration));
   };
 
-  const toggleMute = (e) => {
-    if (e) e.stopPropagation();
+  const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
@@ -468,7 +460,6 @@ export default function CustomPlayer({
   };
 
   const handleVolumeChange = (e) => {
-    e.stopPropagation();
     const video = videoRef.current;
     if (!video) return;
     const val = parseFloat(e.target.value);
@@ -507,10 +498,41 @@ export default function CustomPlayer({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
 
+  // Ekrana Tek Tıklama: Sadece Kontrolleri Aç/Kapa Yapar (Videoyu Durdurmaz)
+  const handleScreenClick = (e) => {
+    // Eğer tıklanan eleman bir buton veya girdi ise bu işlemi yapma
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+
+    setShowControls((prev) => {
+      const nextState = !prev;
+      if (nextState) {
+        // Kontroller açıldıysa otomatik gizleme zamanlayıcısını başlat
+        if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = setTimeout(() => {
+          if (!showSettingsMenu && !showRemoteHelp && isPlaying) {
+            setShowControls(false);
+          }
+        }, 3500);
+      }
+      return nextState;
+    });
+  };
+
+  // Ekrana Çift Tıklama: Oynat / Durdur Yapar
+  const handleScreenDoubleClick = (e) => {
+    if (e.target.closest('button') || e.target.closest('input')) {
+      return;
+    }
+    togglePlay();
+  };
+
   return (
     <div
       ref={containerRef}
-      onClick={handleBackgroundClick}
+      onClick={handleScreenClick}
+      onDoubleClick={handleScreenDoubleClick}
       onMouseMove={showControlsTemporarily}
       className={`relative w-full aspect-video bg-black overflow-hidden select-none font-sans cursor-pointer ${
         isFullscreen
@@ -518,7 +540,7 @@ export default function CustomPlayer({
           : 'rounded-none sm:rounded-2xl border-0 sm:border border-white/10 shadow-2xl'
       }`}
     >
-      {/* Video Element */}
+      {/* Video Element (Tek tıkla durdurma kaldırıldı) */}
       <video
         ref={videoRef}
         playsInline
@@ -527,37 +549,37 @@ export default function CustomPlayer({
 
       {/* SMART TV ANLIK BİLDİRİM / GERİ BİLDİRİM TOAST ROZETİ */}
       {actionNotification && (
-        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 px-3 py-1.5 rounded-lg bg-black/90 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2 shadow-2xl animate-in fade-in duration-200 pointer-events-none">
+        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 px-3 py-1.5 rounded-lg bg-black/90 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2 shadow-2xl animate-in fade-in duration-200">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span>{actionNotification}</span>
         </div>
       )}
 
-      {/* ORTA EKRAN OYNAT / DURDUR VE 10 SN SARMA DÜĞMELERİ */}
+      {/* MOBİL VE DOKUNMATİK İÇİN ORTA EKRAN OYNAT/DURDUR/SARMA DÜĞMELERİ */}
       <div
-        className={`absolute inset-0 flex items-center justify-center gap-6 sm:gap-10 transition-opacity duration-200 ${
+        className={`absolute inset-0 flex items-center justify-center gap-6 sm:gap-10 transition-opacity duration-200 pointer-events-none ${
           showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         <button
-          onClick={(e) => seek(-10, e)}
-          className="p-2.5 sm:p-3.5 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm transition-transform active:scale-90 outline-none"
+          onClick={(e) => { e.stopPropagation(); seek(-10); }}
+          className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
           title="[4] 10sn Geri"
         >
           <RotateCcw size={20} className="sm:w-6 sm:h-6" />
         </button>
 
         <button
-          onClick={togglePlay}
-          className="p-4 sm:p-5 rounded-full bg-white text-black hover:bg-zinc-200 backdrop-blur-sm transition-transform active:scale-90 shadow-2xl outline-none flex items-center justify-center"
+          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+          className="p-3.5 sm:p-5 rounded-full bg-white text-black hover:bg-zinc-200 backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 shadow-2xl outline-none"
           title={isPlaying ? '[5] Durdur' : '[5] Oynat'}
         >
           {isPlaying ? <Pause size={24} className="sm:w-7 sm:h-7" /> : <Play size={24} className="sm:w-7 sm:h-7 ml-0.5" />}
         </button>
 
         <button
-          onClick={(e) => seek(10, e)}
-          className="p-2.5 sm:p-3.5 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm transition-transform active:scale-90 outline-none"
+          onClick={(e) => { e.stopPropagation(); seek(10); }}
+          className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
           title="[6] 10sn İleri"
         >
           <RotateCw size={20} className="sm:w-6 sm:h-6" />
@@ -566,10 +588,7 @@ export default function CustomPlayer({
 
       {/* SMART TV KUMANDA REHBERİ POPUP PENCERESİ */}
       {showRemoteHelp && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="absolute inset-0 bg-black/85 backdrop-blur-md z-50 p-4 sm:p-6 flex flex-col justify-center items-center text-white text-center animate-in fade-in"
-        >
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md z-50 p-4 sm:p-6 flex flex-col justify-center items-center text-white text-center animate-in fade-in">
           <div className="flex items-center justify-between w-full max-w-sm mb-3">
             <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5">
               <Tv size={18} /> Smart TV Kumanda Numaraları
@@ -606,10 +625,7 @@ export default function CustomPlayer({
         }`}
       >
         {/* ÜST BİLGİ ÇUBUĞU */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="flex justify-between items-center pointer-events-auto"
-        >
+        <div className="flex justify-between items-center pointer-events-auto">
           <span className="text-[11px] sm:text-xs font-semibold text-white/90 truncate max-w-[180px] sm:max-w-md">
             {title}
           </span>
@@ -630,10 +646,7 @@ export default function CustomPlayer({
         </div>
 
         {/* ALT KONTROL VE İLERLEME ÇUBUĞU */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="flex flex-col gap-2 pointer-events-auto"
-        >
+        <div className="flex flex-col gap-2 pointer-events-auto">
           {/* İlerleme Çubuğu (Scrubber) */}
           <div
             onClick={handleScrub}
@@ -665,7 +678,7 @@ export default function CustomPlayer({
               {/* Masaüstünde Önceki/Sonraki Butonları */}
               {hasPrev && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); if (onPrevEpisode) onPrevEpisode(); }}
+                  onClick={onPrevEpisode}
                   tabIndex={104}
                   className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
                   title="[1] Önceki Bölüm"
@@ -676,7 +689,7 @@ export default function CustomPlayer({
 
               {hasNext && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); if (onNextEpisode) onNextEpisode(); }}
+                  onClick={onNextEpisode}
                   tabIndex={105}
                   className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
                   title="[3] Sonraki Bölüm"
@@ -718,7 +731,7 @@ export default function CustomPlayer({
             {/* Sağ: Ses Dili / Kalite Ayarları & Tam Ekran */}
             <div className="flex items-center gap-1.5 sm:gap-2 relative">
               <button
-                onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(!showSettingsMenu); }}
+                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                 tabIndex={108}
                 className={`p-1.5 sm:p-2 rounded-lg transition-colors outline-none ${
                   showSettingsMenu ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20 text-zinc-300'
@@ -739,10 +752,7 @@ export default function CustomPlayer({
 
               {/* Ayarlar Açılır Menüsü */}
               {showSettingsMenu && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute bottom-11 right-0 w-56 sm:w-60 bg-[#14151e] border border-white/20 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95 duration-150"
-                >
+                <div className="absolute bottom-11 right-0 w-56 sm:w-60 bg-[#14151e] border border-white/20 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                   {activeSettingsTab === 'main' && (
                     <>
                       <div className="flex items-center justify-between px-2 py-1 border-b border-white/10 pb-1">
