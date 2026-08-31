@@ -180,8 +180,8 @@ export default function WatchDetailsView({
             </span>
           </div>
 
-          {/* Sezon Seçici Sekmeler */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+          {/* Sezon Seçici Sekmeler (Yatay Kaydırılabilir) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
             {seriesData.seasons.map((season, sIdx) => {
               const isSelected = sIdx === selectedSeasonIdx;
               return (
@@ -189,7 +189,7 @@ export default function WatchDetailsView({
                   key={`watch-season-${sIdx}`}
                   onClick={() => setSelectedSeasonIdx(sIdx)}
                   tabIndex={30 + sIdx}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-colors outline-none ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors outline-none ${
                     isSelected
                       ? 'bg-white text-black font-bold'
                       : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-zinc-200 border border-white/5'
@@ -201,8 +201,8 @@ export default function WatchDetailsView({
             })}
           </div>
 
-          {/* Dikey Kaydırılabilir Bölüm Kartları */}
-          <div className="flex flex-col gap-1.5 max-h-[360px] sm:max-h-[580px] overflow-y-auto pr-1">
+          {/* Dikey Kaydırılabilir Bölüm Kartları (Mobilde doğal sayfa akışı, masaüstünde sabit max-h) */}
+          <div className="flex flex-col gap-2 lg:max-h-[580px] lg:overflow-y-auto pr-0 lg:pr-1 pb-16 lg:pb-4">
             {currentSeason.episodes.map((ep, epIdx) => {
               const isCurrentPlaying = activeEpisode?.url === ep.url;
               return (
@@ -210,19 +210,19 @@ export default function WatchDetailsView({
                   key={`ep-item-${ep.url}-${epIdx}`}
                   onClick={() => onSelectEpisode(ep, epIdx, selectedSeasonIdx)}
                   tabIndex={50 + epIdx}
-                  className={`flex items-center justify-between p-2.5 rounded-lg text-left transition-colors border outline-none ${
+                  className={`flex items-center justify-between p-3 rounded-xl text-left transition-colors border outline-none ${
                     isCurrentPlaying
                       ? 'bg-white/15 border-white/30 text-white font-semibold shadow-sm'
                       : 'bg-[#181922] hover:bg-[#20212d] border-white/5 hover:border-white/15 text-zinc-300'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono flex-shrink-0 ${
+                    <span className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono flex-shrink-0 ${
                       isCurrentPlaying ? 'bg-white text-black font-bold' : 'bg-white/10 text-zinc-400'
                     }`}>
                       {ep.episodeNumber}
                     </span>
-                    <span className="text-xs truncate">
+                    <span className="text-xs sm:text-sm font-medium truncate">
                       {ep.title}
                     </span>
                   </div>

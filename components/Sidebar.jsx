@@ -77,7 +77,7 @@ export default function Sidebar() {
       </aside>
 
       {/* 2. MOBİL CİHAZLAR & TELEFONLAR: Alt Menü Çubuğu (Bottom Navigation Bar) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0d0e14]/95 backdrop-blur-xl border-t border-white/10 px-3 py-1.5 flex justify-around items-center safe-area-pb">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0c0d14] border-t border-white/10 px-3 py-1.5 flex justify-around items-center h-16 shadow-[0_-10px_30px_rgba(0,0,0,0.9)] safe-area-bottom">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || (item.href === '/home' && pathname === '/');
@@ -85,16 +85,16 @@ export default function Sidebar() {
             <Link
               key={`mobile-${item.href}`}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg text-[10px] font-medium transition-colors outline-none ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition-colors outline-none select-none ${
                 isActive
                   ? 'text-white font-bold'
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <div className={`p-1 rounded-full ${isActive ? 'bg-white/15 text-white' : ''}`}>
-                <Icon size={19} />
+              <div className={`p-1.5 rounded-lg ${isActive ? 'bg-white/15 text-white' : ''}`}>
+                <Icon size={18} />
               </div>
-              <span className="mt-0.5">{item.label}</span>
+              <span className="mt-0.5 leading-none">{item.label}</span>
             </Link>
           );
         })}

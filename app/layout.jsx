@@ -20,8 +20,8 @@ export default function RootLayout({ children }) {
           {/* Global Sidebar & Mobile Bottom Navigation */}
           <Sidebar />
 
-          {/* Main Page Content - pl-0 on mobile, pl-16 on desktop, pb-20 on mobile for bottom bar */}
-          <main className="flex-1 pl-0 md:pl-16 pb-20 md:pb-6 transition-all duration-200 w-full min-w-0">
+          {/* Main Page Content - pl-0 on mobile, pl-16 on desktop, pb-28 on mobile for bottom bar */}
+          <main className="flex-1 pl-0 md:pl-16 pb-28 md:pb-8 transition-all duration-200 w-full min-w-0">
             {children}
           </main>
         </div>
