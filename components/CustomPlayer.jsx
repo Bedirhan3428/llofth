@@ -237,12 +237,10 @@ export default function CustomPlayer({
     if (!video) return;
     if (video.paused) {
       video.play();
-      showToast('▶ Oynatılıyor');
     } else {
       video.pause();
-      showToast('⏸ Duraklatıldı');
     }
-  }, [showToast]);
+  }, []);
 
   const seek = useCallback((seconds) => {
     const video = videoRef.current;
@@ -664,17 +662,8 @@ export default function CustomPlayer({
 
           {/* Alt Kontrol Butonları */}
           <div className="flex justify-between items-center text-white">
-            {/* Sol: Oynat/Durdur & Süre */}
+            {/* Sol: Süre & Önceki/Sonraki */}
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <button
-                onClick={togglePlay}
-                tabIndex={101}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors outline-none"
-                title="[5] Oynat/Durdur"
-              >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-              </button>
-
               {/* Masaüstünde Önceki/Sonraki Butonları */}
               {hasPrev && (
                 <button
