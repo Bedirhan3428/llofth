@@ -53,6 +53,10 @@ export default function CustomPlayer({
   const [activeSettingsTab, setActiveSettingsTab] = useState('main'); // 'main' | 'audio' | 'quality'
 
   const [showControls, setShowControls] = useState(true);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTime, setScrubTime] = useState(0);
+  const progressBarRef = useRef(null);
+
   const controlsTimerRef = useRef(null);
   const notificationTimerRef = useRef(null);
   const initialSeekDoneRef = useRef(false);
@@ -426,14 +430,56 @@ export default function CustomPlayer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showControlsTemporarily, togglePlay, seek, toggleNativeFullscreen, toggleAudioTrack, hasNext, hasPrev, onNextEpisode, onPrevEpisode, showToast]);
 
-  const handleScrub = (e) => {
+  const calculateTimeFromEvent = useCallback((e) => {
+    const bar = progressBarRef.current;
+    if (!bar || !duration) return 0;
+    const rect = bar.getBoundingClientRect();
+    const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+    const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return pos * duration;
+  }, [duration]);
+
+  const handleScrubStart = (e) => {
     e.stopPropagation();
-    const video = videoRef.current;
-    if (!video || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    video.currentTime = Math.max(0, Math.min(duration, pos * duration));
+    setIsScrubbing(true);
+    const newTime = calculateTimeFromEvent(e);
+    setScrubTime(newTime);
   };
+
+  // Analog Sürükleme ve Bırakma (Drag & Drop Scrubbing) Dinleyicisi
+  useEffect(() => {
+    if (!isScrubbing) return;
+
+    const handleScrubMove = (e) => {
+      const newTime = calculateTimeFromEvent(e);
+      setScrubTime(newTime);
+    };
+
+    const handleScrubEnd = (e) => {
+      const finalTime = calculateTimeFromEvent(e);
+      setIsScrubbing(false);
+      const video = videoRef.current;
+      if (video) {
+        video.currentTime = finalTime;
+        setCurrentTime(finalTime);
+      }
+      showToast(`⏩ ${formatTime(finalTime)}`);
+    };
+
+    window.addEventListener('mousemove', handleScrubMove);
+    window.addEventListener('mouseup', handleScrubEnd);
+    window.addEventListener('touchmove', handleScrubMove, { passive: true });
+    window.addEventListener('touchend', handleScrubEnd);
+    window.addEventListener('touchcancel', handleScrubEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleScrubMove);
+      window.removeEventListener('mouseup', handleScrubEnd);
+      window.removeEventListener('touchmove', handleScrubMove);
+      window.removeEventListener('touchend', handleScrubEnd);
+      window.removeEventListener('touchcancel', handleScrubEnd);
+    };
+  }, [isScrubbing, calculateTimeFromEvent, showToast]);
 
   const toggleMute = (e) => {
     e.stopPropagation();
@@ -481,6 +527,8 @@ export default function CustomPlayer({
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const activeTime = isScrubbing ? scrubTime : currentTime;
+  const activePercent = duration > 0 ? (activeTime / duration) * 100 : 0;
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
 
@@ -752,26 +800,48 @@ export default function CustomPlayer({
 
         {/* ALT ÇUBUK: İlerleme Çubuğu, Süre ve Tam Ekran */}
         <div className="flex flex-col gap-2 w-full">
-          {/* İlerleme Çubuğu (Scrubber) */}
+          {/* Analog İlerleme Çubuğu (Analog Scrubber & Drag Bar) */}
           <div
-            onClick={handleScrub}
-            className="relative w-full h-2 hover:h-3 bg-white/20 rounded-full cursor-pointer transition-all flex items-center"
+            ref={progressBarRef}
+            onMouseDown={handleScrubStart}
+            onTouchStart={handleScrubStart}
+            className="group relative w-full h-3 hover:h-4 bg-white/20 rounded-full cursor-pointer transition-all flex items-center select-none py-1"
           >
+            {/* Arka Plan Tampon (Buffer) */}
             <div
               style={{ width: `${bufferedPercent}%` }}
               className="absolute top-0 left-0 h-full bg-white/20 rounded-full pointer-events-none"
             />
+            {/* Oynatma İlerlemesi */}
             <div
-              style={{ width: `${progressPercent}%` }}
-              className="absolute top-0 left-0 h-full bg-white rounded-full pointer-events-none"
+              style={{ width: `${activePercent}%` }}
+              className="absolute top-0 left-0 h-full bg-white rounded-full pointer-events-none shadow-sm"
             />
+
+            {/* Analog Yuvarlak Sürükleme Topu (Thumb) */}
+            <div
+              style={{ left: `${activePercent}%` }}
+              className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full bg-white border border-black/30 shadow-[0_0_10px_rgba(255,255,255,0.9)] pointer-events-none transition-transform ${
+                isScrubbing ? 'scale-125 bg-emerald-400' : 'group-hover:scale-110'
+              }`}
+            />
+
+            {/* Sürükleme Sırasında Üstte Çıkan Canlı Zaman Rozeti */}
+            {isScrubbing && (
+              <div
+                style={{ left: `${activePercent}%` }}
+                className="absolute -top-8 -translate-x-1/2 bg-black/95 text-white font-mono text-[11px] font-bold px-2 py-0.5 rounded-md border border-white/30 shadow-2xl pointer-events-none whitespace-nowrap"
+              >
+                {formatTime(activeTime)}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-center text-white">
             {/* Sol: Süre & Ses Kontrolü */}
             <div className="flex items-center gap-2">
               <div className="text-[11px] sm:text-xs font-mono text-zinc-300">
-                <span className="text-white font-semibold">{formatTime(currentTime)}</span>
+                <span className="text-white font-semibold">{formatTime(activeTime)}</span>
                 <span className="mx-1 text-zinc-500">/</span>
                 <span>{formatTime(duration)}</span>
               </div>
