@@ -204,17 +204,31 @@ export default function CustomPlayer({
     };
   }, [onProgressUpdate]);
 
-  // Native Fullscreen Listener
+  // Native Fullscreen & Otomatik Yatay (Landscape) Döndürme Dinleyicisi
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+      setIsFullscreen(isFull);
+
+      if (!isFull) {
+        // Tam ekrandan çıkıldığında ekran yönü kilidini aç
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          } else if (screen.unlockOrientation) {
+            screen.unlockOrientation();
+          }
+        } catch (e) {}
+      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
     };
   }, []);
 
@@ -238,30 +252,65 @@ export default function CustomPlayer({
     showToast(`${seconds > 0 ? `+${seconds}sn İleri` : `${seconds}sn Geri`} (${formatTime(nextTime)})`);
   }, [showToast]);
 
-  const toggleNativeFullscreen = useCallback(() => {
+  const toggleNativeFullscreen = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
 
-    if (!document.fullscreenElement) {
-      if (el.requestFullscreen) {
-        el.requestFullscreen();
-      } else if (el.webkitRequestFullscreen) {
-        el.webkitRequestFullscreen();
-      } else if (el.mozRequestFullScreen) {
-        el.mozRequestFullScreen();
-      } else if (el.msRequestFullscreen) {
-        el.msRequestFullscreen();
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
+      try {
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+          await el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+          await el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+          await el.msRequestFullscreen();
+        }
+      } catch (err) {
+        console.log('Fullscreen error:', err);
       }
+
       setIsFullscreen(true);
-      showToast('⛶ Tam Ekran');
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
+      showToast('⛶ Tam Ekran (Yatay)');
+
+      // Mobilde otomatik olarak ekranı yatay moda (landscape) çevir
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape');
+        } else if (screen.lockOrientation) {
+          screen.lockOrientation('landscape');
+        } else if (screen.mozLockOrientation) {
+          screen.mozLockOrientation('landscape');
+        } else if (screen.msLockOrientation) {
+          screen.msLockOrientation('landscape');
+        }
+      } catch (e) {
+        // Bazı tarayıcılar yön kilitlemeye izin vermezse sessizce devam et
       }
+    } else {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          await document.mozCancelFullScreen();
+        }
+      } catch (err) {
+        console.log('Exit fullscreen error:', err);
+      }
+
       setIsFullscreen(false);
       showToast('Pencere Modu');
+
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        } else if (screen.unlockOrientation) {
+          screen.unlockOrientation();
+        }
+      } catch (e) {}
     }
   }, [showToast]);
 
