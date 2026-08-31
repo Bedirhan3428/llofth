@@ -53,17 +53,17 @@ export default function HomePage() {
   const heroItem = featuredItems[0];
 
   return (
-    <div className="p-5 md:p-8 max-w-7xl mx-auto w-full">
+    <div className="p-3.5 sm:p-5 md:p-8 max-w-7xl mx-auto w-full">
       {/* Header */}
-      <header className="flex justify-between items-center mb-6 pb-3 border-b border-white/5">
+      <header className="flex justify-between items-center mb-5 pb-3 border-b border-white/5">
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold tracking-wider text-white lowercase">
+          <span className="text-base sm:text-lg font-bold tracking-wider text-white lowercase">
             llofth
           </span>
-          <span className="text-xs text-zinc-500 font-mono">• ana sayfa</span>
+          <span className="text-[11px] sm:text-xs text-zinc-500 font-mono">• ana sayfa</span>
         </div>
 
-        <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1 rounded-full text-xs text-zinc-300">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs text-zinc-300">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           <span>0.0.0.0:23504 Aktif</span>
         </div>
@@ -74,21 +74,21 @@ export default function HomePage() {
 
       {/* 2. Öne Çıkan Hero Vitrin Banner */}
       {heroItem && (
-        <div className="relative w-full bg-[#13141b] border border-white/10 rounded-2xl p-6 md:p-8 mb-9 overflow-hidden flex flex-col md:flex-row gap-6 items-center justify-between shadow-xl">
-          <div className="flex-1 z-10">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest bg-white/5 border border-white/10 px-2.5 py-1 rounded-md mb-2.5 inline-block">
+        <div className="relative w-full bg-[#13141b] border border-white/10 rounded-2xl p-4 sm:p-6 md:p-8 mb-7 sm:mb-9 overflow-hidden flex flex-col-reverse sm:flex-row gap-4 sm:gap-6 items-center justify-between shadow-xl">
+          <div className="flex-1 z-10 text-center sm:text-left">
+            <span className="text-[10px] sm:text-[11px] font-bold text-zinc-400 uppercase tracking-widest bg-white/5 border border-white/10 px-2.5 py-1 rounded-md mb-2 inline-block">
               Öne Çıkan Dizi
             </span>
-            <h1 className="text-2xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
+            <h1 className="text-xl sm:text-2xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
               {heroItem.title}
             </h1>
-            <p className="text-xs md:text-sm text-zinc-400 max-w-xl mb-5 leading-relaxed">
+            <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mb-4 sm:mb-5 leading-relaxed hidden sm:block">
               Yerel HLS Gateway üzerinden doğrudan Smart TV'nize veya tarayıcınıza kesintisiz, çift sesli 1080p video akışı.
             </p>
             <button
               onClick={() => handleCardClick(heroItem)}
               tabIndex={10}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white text-black font-bold text-xs rounded-lg hover:bg-zinc-200 transition-colors shadow-md outline-none"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-black font-bold text-xs rounded-lg hover:bg-zinc-200 transition-colors shadow-md outline-none"
             >
               <Play size={14} fill="currentColor" />
               <span>Hemen İzle</span>
@@ -99,20 +99,20 @@ export default function HomePage() {
             <img
               src={heroItem.poster}
               alt={heroItem.title}
-              className="w-36 md:w-48 aspect-[2/3] object-cover rounded-xl border border-white/10 shadow-2xl flex-shrink-0"
+              className="w-28 sm:w-36 md:w-48 aspect-[2/3] object-cover rounded-xl border border-white/10 shadow-2xl flex-shrink-0"
             />
           )}
         </div>
       )}
 
       {/* 3. Popüler & Trend İçerikler Izgarası */}
-      <section className="mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-            <Flame size={16} className="text-zinc-400" />
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3.5">
+          <h2 className="text-xs sm:text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
+            <Flame size={15} className="text-zinc-400" />
             <span>Popüler ve Trend İçerikler</span>
           </h2>
-          <span className="text-xs text-zinc-500 font-mono">
+          <span className="text-[11px] text-zinc-500 font-mono">
             {featuredItems.length} başlık
           </span>
         </div>
@@ -122,7 +122,7 @@ export default function HomePage() {
             <div className="loader-spin" style={{ width: 28, height: 28, borderWidth: 3 }}></div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-4">
             {featuredItems.map((item, index) => (
               <VideoCard
                 key={`${item.url}-${index}`}

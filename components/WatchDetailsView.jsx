@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import CustomPlayer from '@/components/CustomPlayer';
 import { saveWatchProgress, getEpisodeProgress } from '@/lib/history';
-import { ArrowLeft, Layers, Calendar, Play, Tv } from 'lucide-react';
+import { ArrowLeft, Calendar, Play, Tv } from 'lucide-react';
 
 export default function WatchDetailsView({
   seriesData,
@@ -69,30 +69,30 @@ export default function WatchDetailsView({
   return (
     <div className="w-full">
       {/* Üst Geri Dön Çubuğu */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
         <button
           onClick={onBack}
           tabIndex={20}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-semibold border border-white/10 transition-colors outline-none"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-semibold border border-white/10 transition-colors outline-none"
         >
-          <ArrowLeft size={15} />
+          <ArrowLeft size={14} />
           <span>Geri Dön</span>
         </button>
 
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <span>{seriesData.title}</span>
+        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-400 truncate max-w-[200px] sm:max-w-md">
+          <span className="truncate">{seriesData.title}</span>
           <span>•</span>
-          <span className="text-white font-medium">{activeEpisode?.title}</span>
+          <span className="text-white font-medium truncate">{activeEpisode?.title}</span>
         </div>
       </div>
 
       {/* YouTube Tarzı İki Kolonlu Video & Bölüm Detay Düzeni */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* SOL ANA ALAN: Video Oynatıcı & Video Bilgileri (8 Kolon) */}
-        <div className="lg:col-span-8 flex flex-col gap-4">
+        <div className="lg:col-span-8 flex flex-col gap-3 sm:gap-4">
           {/* 16:9 Gömülü Video Oynatıcı */}
           {isLoadingStream ? (
-            <div className="w-full aspect-video bg-[#13141b] rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-3">
+            <div className="w-full aspect-video bg-[#13141b] rounded-xl sm:rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-3">
               <div className="loader-spin" style={{ width: 28, height: 28, borderWidth: 3 }}></div>
               <p className="text-xs text-zinc-400 font-medium">Bölüm akışı hazırlanıyor, lütfen bekleyin...</p>
             </div>
@@ -108,49 +108,49 @@ export default function WatchDetailsView({
               hasPrev={hasPrev}
             />
           ) : (
-            <div className="w-full aspect-video bg-[#13141b] rounded-2xl border border-white/10 flex items-center justify-center text-xs text-zinc-400">
+            <div className="w-full aspect-video bg-[#13141b] rounded-xl sm:rounded-2xl border border-white/10 flex items-center justify-center text-xs text-zinc-400">
               Oynatılacak akış seçilmedi.
             </div>
           )}
 
           {/* Video Altı Başlık ve Bilgiler */}
-          <div className="p-4 bg-[#13141b] border border-white/10 rounded-xl">
-            <div className="flex flex-wrap justify-between items-start gap-3 mb-2.5">
+          <div className="p-3.5 sm:p-4 bg-[#13141b] border border-white/10 rounded-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2.5 mb-2.5">
               <div>
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded border border-white/5 mb-1.5 inline-block">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded border border-white/5 mb-1 inline-block">
                   {seriesData.title}
                 </span>
-                <h1 className="text-lg md:text-xl font-bold text-white leading-snug">
+                <h1 className="text-base sm:text-lg md:text-xl font-bold text-white leading-snug">
                   {activeEpisode?.title || 'Bölüm'}
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                 {hasPrev && (
                   <button
                     onClick={onPrevEpisode}
                     tabIndex={25}
-                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-zinc-300 border border-white/10 transition-colors"
+                    className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-zinc-300 border border-white/10 transition-colors text-center"
                   >
-                    ◀ Önceki Bölüm
+                    ◀ Önceki
                   </button>
                 )}
                 {hasNext && (
                   <button
                     onClick={onNextEpisode}
                     tabIndex={26}
-                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-xs font-semibold text-white border border-white/10 transition-colors"
+                    className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-xs font-semibold text-white border border-white/10 transition-colors text-center"
                   >
-                    Sonraki Bölüm ▶
+                    Sonraki ▶
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400 pt-2 border-t border-white/5">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-zinc-400 pt-2 border-t border-white/5">
               {activeEpisode?.date && (
                 <span className="flex items-center gap-1">
-                  <Calendar size={12} /> {activeEpisode.date}
+                  <Calendar size={11} /> {activeEpisode.date}
                 </span>
               )}
               <span>•</span>
@@ -160,7 +160,7 @@ export default function WatchDetailsView({
             </div>
 
             {seriesData.description && (
-              <p className="text-xs text-zinc-400 mt-3 leading-relaxed border-t border-white/5 pt-2.5">
+              <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed border-t border-white/5 pt-2">
                 {seriesData.description}
               </p>
             )}
@@ -168,8 +168,8 @@ export default function WatchDetailsView({
         </div>
 
         {/* SAĞ YAN ALAN: Sezonlar ve Bölüm Listesi (4 Kolon - YouTube Playlist Tarzı) */}
-        <div className="lg:col-span-4 bg-[#13141b] border border-white/10 rounded-xl p-3.5 flex flex-col gap-3">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+        <div className="lg:col-span-4 bg-[#13141b] border border-white/10 rounded-xl p-3 sm:p-3.5 flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Tv size={14} /> Bölüm Listesi
             </span>
@@ -200,7 +200,7 @@ export default function WatchDetailsView({
           </div>
 
           {/* Dikey Kaydırılabilir Bölüm Kartları */}
-          <div className="flex flex-col gap-1.5 max-h-[580px] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-1.5 max-h-[360px] sm:max-h-[580px] overflow-y-auto pr-1">
             {currentSeason.episodes.map((ep, epIdx) => {
               const isCurrentPlaying = activeEpisode?.url === ep.url;
               return (
@@ -231,7 +231,7 @@ export default function WatchDetailsView({
                         <Play size={10} fill="currentColor" /> Çalıyor
                       </span>
                     ) : (
-                      <span className="text-zinc-500 hover:text-zinc-300">
+                      <span className="text-zinc-500 hover:text-zinc-300 text-xs">
                         Oynat
                       </span>
                     )}
