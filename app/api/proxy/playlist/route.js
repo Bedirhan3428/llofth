@@ -1,28 +1,34 @@
+import { NextResponse } from 'next/server';
 import { rewritePlaylist } from '@/lib/hls-proxy';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const targetUrl = searchParams.get('url');
+  const playlistUrl = searchParams.get('url');
 
-  if (!targetUrl) {
-    return new Response('Hata: "url" parametresi zorunludur.', { status: 400 });
+  if (!playlistUrl) {
+    return NextResponse.json({ error: 'Playlist URL parametresi gereklidir.' }, { status: 400 });
   }
 
   try {
-    const rewrittenContent = await rewritePlaylist(targetUrl);
-
+    const rewrittenContent = await rewritePlaylist(playlistUrl);
+    
     return new Response(rewrittenContent, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
       }
     });
-  } catch (error) {
-    console.error(`[API /api/proxy/playlist Hata] ${targetUrl} ->`, error.message);
-    return new Response(`Playlist Proxy Hatası: ${error.message}`, { status: 502 });
+  } catch (err) {
+    console.error('[API Playlist Proxy Hata]:', err.message);
+    return NextResponse.json(
+      { error: `Playlist proxy hatası: ${err.message}` },
+      { status: 500 }
+    );
   }
 }
