@@ -484,24 +484,27 @@ export default function CustomPlayer({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
 
-  // Ekrana Tek Tıklama: Sadece Kontrolleri Aç/Kapa Yapar
+  // Ekrana Tek Tıklama: Kontroller Gizliyse Açar, Açıksa Kapatır
   const handleScreenClick = (e) => {
+    // Butonlara, inputlara veya menüye tıklandıysa ana ekran tıklamasını yok say
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('a')) {
       return;
     }
 
-    setShowControls((prev) => {
-      const nextState = !prev;
-      if (nextState) {
-        if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-        controlsTimerRef.current = setTimeout(() => {
-          if (!showSettingsMenu && !showRemoteHelp && isPlaying) {
-            setShowControls(false);
-          }
-        }, 3500);
-      }
-      return nextState;
-    });
+    if (!showControls) {
+      // Kapalıysa aç ve 4 saniye sonra otomatik gizle
+      setShowControls(true);
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = setTimeout(() => {
+        if (!showSettingsMenu && !showRemoteHelp && isPlaying) {
+          setShowControls(false);
+        }
+      }, 4000);
+    } else {
+      // Zaten açıksa kapat
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      setShowControls(false);
+    }
   };
 
   // Ekrana Çift Tıklama: Oynat / Durdur Yapar
@@ -517,7 +520,17 @@ export default function CustomPlayer({
       ref={containerRef}
       onClick={handleScreenClick}
       onDoubleClick={handleScreenDoubleClick}
-      onMouseMove={showControlsTemporarily}
+      onMouseMove={() => {
+        if (!showControls) {
+          setShowControls(true);
+        }
+        if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = setTimeout(() => {
+          if (!showSettingsMenu && !showRemoteHelp && isPlaying) {
+            setShowControls(false);
+          }
+        }, 3500);
+      }}
       className={`relative w-full aspect-video bg-black overflow-hidden select-none font-sans cursor-pointer ${
         isFullscreen
           ? 'fixed inset-0 w-screen h-screen z-[99999] rounded-none border-0'
