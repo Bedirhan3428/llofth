@@ -1,14 +1,16 @@
 @echo off
 chcp 65001 > nul
-title llofth • Yerel Medya Portalı
+title llofth • Yerel Medya Portali
 color 0B
 cls
 
 echo ===============================================================================
-echo            ll      ll                 ffff  tt     hh      
-echo            ll      ll        oooo    ff     tt     hh      
-echo            ll      ll       oo  oo  ffff  tttttt   hhhhhh  
-echo            llllll  llllll    oooo    ff     tt     hh  hh  
+echo  ██╗     ██╗      ██████╗ ███████╗████████╗██╗  ██╗
+echo  ██║     ██║     ██╔═══██╗██╔════╝╚══██╔══╝██║  ██║
+echo  ██║     ██║     ██║   ██║█████╗     ██║   ███████║
+echo  ██║     ██║     ██║   ██║██╔══╝     ██║   ██╔══██║
+echo  ███████╗███████╗╚██████╔╝██║        ██║   ██║  ██║
+echo  ╚══════╝╚══════╝ ╚═════╝ ╚═╝        ╚═╝   ╚═╝  ╚═╝
 echo.
 echo                   YEREL MEDYA AG GECIDI ^& SMART TV PORTALI
 echo ===============================================================================
