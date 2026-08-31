@@ -16,7 +16,8 @@ import {
   Radio,
   Sliders,
   Check,
-  X
+  X,
+  Tv
 } from 'lucide-react';
 
 export default function CustomPlayer({
@@ -40,7 +41,8 @@ export default function CustomPlayer({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [resumeNotification, setResumeNotification] = useState(null);
+  const [actionNotification, setActionNotification] = useState(null);
+  const [showRemoteHelp, setShowRemoteHelp] = useState(false);
 
   // Menüler
   const [audioTracks, setAudioTracks] = useState([]);
@@ -52,17 +54,26 @@ export default function CustomPlayer({
 
   const [showControls, setShowControls] = useState(true);
   const controlsTimerRef = useRef(null);
+  const notificationTimerRef = useRef(null);
   const initialSeekDoneRef = useRef(false);
+
+  const showToast = useCallback((msg) => {
+    setActionNotification(msg);
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = setTimeout(() => {
+      setActionNotification(null);
+    }, 2500);
+  }, []);
 
   const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
     controlsTimerRef.current = setTimeout(() => {
-      if (!showSettingsMenu) {
+      if (!showSettingsMenu && !showRemoteHelp) {
         setShowControls(false);
       }
     }, 3500);
-  }, [showSettingsMenu]);
+  }, [showSettingsMenu, showRemoteHelp]);
 
   // Hls.js başlatma & Kaldığı Yerden Devam Etme
   useEffect(() => {
@@ -80,8 +91,7 @@ export default function CustomPlayer({
       if (!initialSeekDoneRef.current && initialTime > 5) {
         video.currentTime = initialTime;
         initialSeekDoneRef.current = true;
-        setResumeNotification(`Kaldığınız yerden devam ediliyor (${formatTime(initialTime)})`);
-        setTimeout(() => setResumeNotification(null), 4000);
+        showToast(`Kaldığınız yerden devam ediliyor (${formatTime(initialTime)})`);
       }
     };
 
@@ -144,7 +154,7 @@ export default function CustomPlayer({
       video.addEventListener('loadedmetadata', applyInitialSeek);
       video.play().catch(e => console.log('Native oynatma:', e));
     }
-  }, [streamUrl, initialTime]);
+  }, [streamUrl, initialTime, showToast]);
 
   // Zaman & Buffer & İlerleme Kaydetme
   useEffect(() => {
@@ -208,87 +218,27 @@ export default function CustomPlayer({
     };
   }, []);
 
-  // TV Kumandası & Klavye Dinleyicisi
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      showControlsTemporarily();
-      const video = videoRef.current;
-      if (!video) return;
-
-      if (e.key === ' ' || e.key === 'k') {
-        e.preventDefault();
-        if (video.paused) video.play(); else video.pause();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 10);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        video.currentTime = Math.max(0, video.currentTime - 10);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const newVol = Math.min(1, video.volume + 0.1);
-        video.volume = newVol;
-        setVolume(newVol);
-        setIsMuted(false);
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const newVol = Math.max(0, video.volume - 0.1);
-        video.volume = newVol;
-        setVolume(newVol);
-      } else if (e.key === 'm' || e.key === 'M') {
-        video.muted = !video.muted;
-        setIsMuted(video.muted);
-      } else if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault();
-        toggleNativeFullscreen();
-      } else if (e.key === 'n' || e.key === 'N') {
-        if (hasNext && onNextEpisode) onNextEpisode();
-      } else if (e.key === 'p' || e.key === 'P') {
-        if (hasPrev && onPrevEpisode) onPrevEpisode();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showControlsTemporarily, hasNext, hasPrev, onNextEpisode, onPrevEpisode]);
-
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play(); else video.pause();
-  };
+    if (video.paused) {
+      video.play();
+      showToast('▶ Oynatılıyor');
+    } else {
+      video.pause();
+      showToast('⏸ Duraklatıldı');
+    }
+  }, [showToast]);
 
-  const seek = (seconds) => {
+  const seek = useCallback((seconds) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + seconds));
-  };
+    const nextTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + seconds));
+    video.currentTime = nextTime;
+    showToast(`${seconds > 0 ? `+${seconds}sn İleri` : `${seconds}sn Geri`} (${formatTime(nextTime)})`);
+  }, [showToast]);
 
-  const handleScrub = (e) => {
-    const video = videoRef.current;
-    if (!video || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    video.currentTime = Math.max(0, Math.min(duration, pos * duration));
-  };
-
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
-
-  const handleVolumeChange = (e) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const val = parseFloat(e.target.value);
-    video.volume = val;
-    setVolume(val);
-    setIsMuted(val === 0);
-  };
-
-  const toggleNativeFullscreen = () => {
+  const toggleNativeFullscreen = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
 
@@ -303,6 +253,7 @@ export default function CustomPlayer({
         el.msRequestFullscreen();
       }
       setIsFullscreen(true);
+      showToast('⛶ Tam Ekran');
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
@@ -310,7 +261,162 @@ export default function CustomPlayer({
         document.webkitExitFullscreen();
       }
       setIsFullscreen(false);
+      showToast('Pencere Modu');
     }
+  }, [showToast]);
+
+  const toggleAudioTrack = useCallback(() => {
+    if (!hlsRef.current || audioTracks.length < 2) {
+      showToast('Tek ses kanalı mevcut');
+      return;
+    }
+    const nextTrack = (selectedAudio + 1) % audioTracks.length;
+    setSelectedAudio(nextTrack);
+    hlsRef.current.audioTrack = nextTrack;
+    const trackName = audioTracks[nextTrack]?.name || audioTracks[nextTrack]?.lang || `Kanal ${nextTrack + 1}`;
+    showToast(`🔊 Ses Dili: ${trackName}`);
+  }, [audioTracks, selectedAudio, showToast]);
+
+  // SMART TV KUMANDA NUMARATİK KISAYOLLARI (0-9) & KLAVYE DİNLEYİCİSİ
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Eğer kullanıcı arama çubuğuna yazı yazıyorsa kısayolları çalıştırma
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      showControlsTemporarily();
+      const video = videoRef.current;
+      if (!video) return;
+
+      const key = e.key;
+
+      // --- 1. SMART TV KUMANDASI NUMARA TUŞLARI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9) ---
+      if (key === '5') {
+        // 5: Oynat / Duraklat (Merkez Tuş)
+        e.preventDefault();
+        togglePlay();
+      } else if (key === '4') {
+        // 4: 10sn Geri Sar (Sol)
+        e.preventDefault();
+        seek(-10);
+      } else if (key === '6') {
+        // 6: 10sn İleri Sar (Sağ)
+        e.preventDefault();
+        seek(10);
+      } else if (key === '8') {
+        // 8: Ses Aç (+10%) (Yukarı)
+        e.preventDefault();
+        const newVol = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+        video.volume = newVol;
+        setVolume(newVol);
+        setIsMuted(false);
+        showToast(`🔊 Ses: %${Math.round(newVol * 100)}`);
+      } else if (key === '2') {
+        // 2: Ses Kıs (-10%) (Aşağı)
+        e.preventDefault();
+        const newVol = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+        video.volume = newVol;
+        setVolume(newVol);
+        showToast(`🔉 Ses: %${Math.round(newVol * 100)}`);
+      } else if (key === '0') {
+        // 0: Tam Ekran Modu (Fullscreen)
+        e.preventDefault();
+        toggleNativeFullscreen();
+      } else if (key === '7') {
+        // 7: Ses Dili Değiştir (Dual Audio: Türkçe ⇄ İngilizce)
+        e.preventDefault();
+        toggleAudioTrack();
+      } else if (key === '9') {
+        // 9: Sesi Kapat / Aç (Mute)
+        e.preventDefault();
+        video.muted = !video.muted;
+        setIsMuted(video.muted);
+        showToast(video.muted ? '🔇 Ses Kapatıldı' : '🔊 Ses Açıldı');
+      } else if (key === '1') {
+        // 1: Önceki Bölüm
+        e.preventDefault();
+        if (hasPrev && onPrevEpisode) {
+          showToast('◀ Önceki Bölüme Geçiliyor...');
+          onPrevEpisode();
+        } else {
+          showToast('İlk bölümdesiniz');
+        }
+      } else if (key === '3') {
+        // 3: Sonraki Bölüm
+        e.preventDefault();
+        if (hasNext && onNextEpisode) {
+          showToast('Sonraki Bölüme Geçiliyor ▶');
+          onNextEpisode();
+        } else {
+          showToast('Son bölümdesiniz');
+        }
+      }
+
+      // --- 2. KLAVYE VE STANDART MEDYA TUŞLARI ---
+      else if (key === ' ' || key === 'k' || key === 'MediaPlayPause') {
+        e.preventDefault();
+        togglePlay();
+      } else if (key === 'ArrowRight' || key === 'MediaFastForward') {
+        e.preventDefault();
+        seek(10);
+      } else if (key === 'ArrowLeft' || key === 'MediaRewind') {
+        e.preventDefault();
+        seek(-10);
+      } else if (key === 'ArrowUp') {
+        e.preventDefault();
+        const newVol = Math.min(1, Math.round((video.volume + 0.1) * 10) / 10);
+        video.volume = newVol;
+        setVolume(newVol);
+        setIsMuted(false);
+        showToast(`🔊 Ses: %${Math.round(newVol * 100)}`);
+      } else if (key === 'ArrowDown') {
+        e.preventDefault();
+        const newVol = Math.max(0, Math.round((video.volume - 0.1) * 10) / 10);
+        video.volume = newVol;
+        setVolume(newVol);
+        showToast(`🔉 Ses: %${Math.round(newVol * 100)}`);
+      } else if (key === 'm' || key === 'M') {
+        video.muted = !video.muted;
+        setIsMuted(video.muted);
+        showToast(video.muted ? '🔇 Ses Kapatıldı' : '🔊 Ses Açıldı');
+      } else if (key === 'f' || key === 'F') {
+        e.preventDefault();
+        toggleNativeFullscreen();
+      } else if (key === 'n' || key === 'N' || key === 'MediaTrackNext') {
+        if (hasNext && onNextEpisode) onNextEpisode();
+      } else if (key === 'p' || key === 'P' || key === 'MediaTrackPrevious') {
+        if (hasPrev && onPrevEpisode) onPrevEpisode();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showControlsTemporarily, togglePlay, seek, toggleNativeFullscreen, toggleAudioTrack, hasNext, hasPrev, onNextEpisode, onPrevEpisode, showToast]);
+
+  const handleScrub = (e) => {
+    const video = videoRef.current;
+    if (!video || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    video.currentTime = Math.max(0, Math.min(duration, pos * duration));
+  };
+
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+    showToast(video.muted ? '🔇 Ses Kapatıldı' : '🔊 Ses Açıldı');
+  };
+
+  const handleVolumeChange = (e) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const val = parseFloat(e.target.value);
+    video.volume = val;
+    setVolume(val);
+    setIsMuted(val === 0);
   };
 
   const changeAudioTrack = (trackId) => {
@@ -318,6 +424,8 @@ export default function CustomPlayer({
     if (hlsRef.current && trackId !== -1) {
       hlsRef.current.audioTrack = trackId;
     }
+    const name = audioTracks[trackId]?.name || audioTracks[trackId]?.lang || `Kanal ${trackId + 1}`;
+    showToast(`🔊 Ses Dili: ${name}`);
     setShowSettingsMenu(false);
   };
 
@@ -326,6 +434,8 @@ export default function CustomPlayer({
     if (hlsRef.current) {
       hlsRef.current.currentLevel = levelId;
     }
+    const label = levelId === -1 ? 'Otomatik' : `${qualities[levelId]?.height}p`;
+    showToast(`⚙️ Kalite: ${label}`);
     setShowSettingsMenu(false);
   };
 
@@ -358,11 +468,11 @@ export default function CustomPlayer({
         className="w-full h-full object-contain cursor-pointer bg-black"
       />
 
-      {/* Kaldığı Yerden Devam Bildirimi */}
-      {resumeNotification && (
-        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-black/85 backdrop-blur-md border border-white/20 text-white text-[10px] sm:text-xs font-semibold flex items-center gap-2 shadow-lg">
-          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>{resumeNotification}</span>
+      {/* SMART TV ANLIK BİLDİRİM / GERİ BİLDİRİM TOAST ROZETİ */}
+      {actionNotification && (
+        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 px-3 py-1.5 rounded-lg bg-black/90 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2 shadow-2xl animate-in fade-in duration-200">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{actionNotification}</span>
         </div>
       )}
 
@@ -375,7 +485,7 @@ export default function CustomPlayer({
         <button
           onClick={(e) => { e.stopPropagation(); seek(-10); }}
           className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
-          title="10sn Geri"
+          title="[4] 10sn Geri"
         >
           <RotateCcw size={20} className="sm:w-6 sm:h-6" />
         </button>
@@ -383,7 +493,7 @@ export default function CustomPlayer({
         <button
           onClick={(e) => { e.stopPropagation(); togglePlay(); }}
           className="p-3.5 sm:p-5 rounded-full bg-white text-black hover:bg-zinc-200 backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 shadow-2xl outline-none"
-          title={isPlaying ? 'Durdur' : 'Oynat'}
+          title={isPlaying ? '[5] Durdur' : '[5] Oynat'}
         >
           {isPlaying ? <Pause size={24} className="sm:w-7 sm:h-7" /> : <Play size={24} className="sm:w-7 sm:h-7 ml-0.5" />}
         </button>
@@ -391,11 +501,43 @@ export default function CustomPlayer({
         <button
           onClick={(e) => { e.stopPropagation(); seek(10); }}
           className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
-          title="10sn İleri"
+          title="[6] 10sn İleri"
         >
           <RotateCw size={20} className="sm:w-6 sm:h-6" />
         </button>
       </div>
+
+      {/* SMART TV KUMANDA REHBERİ POPUP PENCERESİ */}
+      {showRemoteHelp && (
+        <div className="absolute inset-0 bg-black/85 backdrop-blur-md z-50 p-4 sm:p-6 flex flex-col justify-center items-center text-white text-center animate-in fade-in">
+          <div className="flex items-center justify-between w-full max-w-sm mb-3">
+            <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5">
+              <Tv size={18} /> Smart TV Kumanda Numaraları
+            </h3>
+            <button onClick={() => setShowRemoteHelp(false)} className="p-1 text-zinc-400 hover:text-white">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 w-full max-w-sm text-xs font-medium">
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">1</b><br/>Önceki Bölüm</div>
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">2</b><br/>Ses Kıs (-10)</div>
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">3</b><br/>Sonraki Bölüm</div>
+            
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">4</b><br/>10sn Geri</div>
+            <div className="p-2 rounded bg-white/20 border border-white/20"><b className="text-emerald-400 text-sm">5</b><br/>Oynat / Durdur</div>
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">6</b><br/>10sn İleri</div>
+
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">7</b><br/>Ses Dili (TR/EN)</div>
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">8</b><br/>Ses Aç (+10)</div>
+            <div className="p-2 rounded bg-white/10 border border-white/10"><b className="text-emerald-400 text-sm">9</b><br/>Sessiz (Mute)</div>
+            
+            <div className="col-span-3 p-2 rounded bg-white/10 border border-white/10">
+              <b className="text-emerald-400 text-sm">0</b> : Tam Ekran (Fullscreen)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Kontroller Katmanı (Üst & Alt Barlar) */}
       <div
@@ -405,12 +547,23 @@ export default function CustomPlayer({
       >
         {/* ÜST BİLGİ ÇUBUĞU */}
         <div className="flex justify-between items-center pointer-events-auto">
-          <span className="text-[11px] sm:text-xs font-semibold text-white/90 truncate max-w-[200px] sm:max-w-md">
+          <span className="text-[11px] sm:text-xs font-semibold text-white/90 truncate max-w-[180px] sm:max-w-md">
             {title}
           </span>
-          <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400 bg-black/60 px-2 py-0.5 rounded border border-white/10 flex-shrink-0 ml-2">
-            HLS 1080p
-          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowRemoteHelp(!showRemoteHelp)}
+              className="flex items-center gap-1 text-[10px] sm:text-[11px] text-zinc-300 bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded border border-white/10 transition-colors"
+              title="Kumanda Numaraları Kılavuzu"
+            >
+              <Tv size={12} />
+              <span>Kumanda (0-9)</span>
+            </button>
+            <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400 bg-black/60 px-2 py-0.5 rounded border border-white/10">
+              HLS 1080p
+            </span>
+          </div>
         </div>
 
         {/* ALT KONTROL VE İLERLEME ÇUBUĞU */}
@@ -438,6 +591,7 @@ export default function CustomPlayer({
                 onClick={togglePlay}
                 tabIndex={101}
                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors outline-none"
+                title="[5] Oynat/Durdur"
               >
                 {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
               </button>
@@ -448,6 +602,7 @@ export default function CustomPlayer({
                   onClick={onPrevEpisode}
                   tabIndex={104}
                   className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
+                  title="[1] Önceki Bölüm"
                 >
                   <SkipBack size={13} /> Önceki
                 </button>
@@ -458,17 +613,19 @@ export default function CustomPlayer({
                   onClick={onNextEpisode}
                   tabIndex={105}
                   className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
+                  title="[3] Sonraki Bölüm"
                 >
                   Sonraki <SkipForward size={13} />
                 </button>
               )}
 
-              {/* Ses Kaydırıcı (Masaüstünde gösterilir, mobilde yer tasarrufu için gizlenir) */}
+              {/* Ses Kaydırıcı */}
               <div className="hidden sm:flex items-center gap-1.5 ml-1">
                 <button
                   onClick={toggleMute}
                   tabIndex={106}
                   className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white outline-none"
+                  title="[9] Sessiz"
                 >
                   {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
                 </button>
@@ -500,7 +657,7 @@ export default function CustomPlayer({
                 className={`p-1.5 sm:p-2 rounded-lg transition-colors outline-none ${
                   showSettingsMenu ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20 text-zinc-300'
                 }`}
-                title="Ses Dili & Kalite"
+                title="Ses Dili & Kalite [7]"
               >
                 <Sliders size={15} />
               </button>
@@ -509,7 +666,7 @@ export default function CustomPlayer({
                 onClick={toggleNativeFullscreen}
                 tabIndex={109}
                 className="p-1.5 sm:p-2 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-200 hover:text-white transition-colors outline-none"
-                title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}
+                title="[0] Tam Ekran"
               >
                 {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
               </button>

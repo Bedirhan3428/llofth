@@ -82,19 +82,24 @@ Tarayıcınızda açın:
 
 ---
 
-## ⌨️ Klavye ve Smart TV Kumanda Kısayolları
+## 🎮 Smart TV Kumanda Numaraları & Klavye Kısayolları
 
-| Tuş | Eylem |
-|---|---|
-| **`Space` / `K` / `OK Tuşu`** | Videoyu Oynat / Duraklat |
-| **`▶ Sağ Ok`** | 10 Saniye İleri Sar |
-| **`◀ Sol Ok`** | 10 Saniye Geri Sar |
-| **`▲ Yukarı Ok`** | Sesi Aç (+10%) |
-| **`▼ Aşağı Ok`** | Sesi Kıs (-10%) |
-| **`F`** | Gerçek Tam Ekran (Tarayıcıyı kaplar) |
-| **`M`** | Sesi Kapat / Aç (Mute) |
-| **`N`** | Sonraki Bölüme Geç |
-| **`P`** | Önceki Bölüme Geç |
+Smart TV tarayıcılarında yön tuşları fare imlecini hareket ettirdiği için, **fiziksel TV kumandasındaki numara tuşları (0-9)** en hızlı kontrol yöntemidir:
+
+| TV Kumanda Tuşu | Klavye Tuşu | Eylem | Açıklama |
+|---|---|---|---|
+| **`5`** | `Space` / `K` | **Oynat / Duraklat** | Merkez tuş (Play / Pause) |
+| **`4`** | `◀ Sol Ok` | **10 Sn Geri Sar** | Sol taraf (Rewind 10s) |
+| **`6`** | `▶ Sağ Ok` | **10 Sn İleri Sar** | Sağ taraf (Fast Forward 10s) |
+| **`8`** | `▲ Yukarı Ok` | **Sesi Aç (+10%)** | Yukarı yön (Volume Up) |
+| **`2`** | `▼ Aşağı Ok` | **Sesi Kıs (-10%)** | Aşağı yön (Volume Down) |
+| **`0`** | `F` | **Tam Ekran (Fullscreen)** | Tarayıcı dahil ekranı kaplar |
+| **`7`** | - | **Ses Dili (Dual Audio)** | Türkçe Dublaj ⇄ Orijinal İngilizce |
+| **`9`** | `M` | **Sesi Kapat / Aç (Mute)** | Sessize al |
+| **`1`** | `P` | **Önceki Bölüm** | Önceki bölüme geçer |
+| **`3`** | `N` | **Sonraki Bölüm** | Sonraki bölüme geçer |
+
+> 💡 **İpucu:** Kumandadan herhangi bir numaraya bastığınızda TV ekranının sol üst köşesinde anlık görsel geri bildirim rozeti belirir (*Örn: `▶ Oynatılıyor`, `+10sn İleri`, `🔊 Ses: %80`*).
 
 ---
 
