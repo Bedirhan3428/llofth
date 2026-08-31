@@ -69,7 +69,7 @@ export default function WatchDetailsView({
   return (
     <div className="w-full">
       {/* Üst Geri Dön Çubuğu */}
-      <div className="flex items-center justify-between mb-3 sm:mb-4">
+      <div className="flex items-center justify-between mb-2.5 sm:mb-4 px-3 sm:px-0 pt-2 sm:pt-0">
         <button
           onClick={onBack}
           tabIndex={20}
@@ -79,7 +79,7 @@ export default function WatchDetailsView({
           <span>Geri Dön</span>
         </button>
 
-        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-400 truncate max-w-[200px] sm:max-w-md">
+        <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-zinc-400 truncate max-w-[180px] sm:max-w-md">
           <span className="truncate">{seriesData.title}</span>
           <span>•</span>
           <span className="text-white font-medium truncate">{activeEpisode?.title}</span>
@@ -87,34 +87,36 @@ export default function WatchDetailsView({
       </div>
 
       {/* YouTube Tarzı İki Kolonlu Video & Bölüm Detay Düzeni */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 items-start">
         {/* SOL ANA ALAN: Video Oynatıcı & Video Bilgileri (8 Kolon) */}
         <div className="lg:col-span-8 flex flex-col gap-3 sm:gap-4">
-          {/* 16:9 Gömülü Video Oynatıcı */}
-          {isLoadingStream ? (
-            <div className="w-full aspect-video bg-[#13141b] rounded-xl sm:rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-3">
-              <div className="loader-spin" style={{ width: 28, height: 28, borderWidth: 3 }}></div>
-              <p className="text-xs text-zinc-400 font-medium">Bölüm akışı hazırlanıyor, lütfen bekleyin...</p>
-            </div>
-          ) : streamUrl ? (
-            <CustomPlayer
-              streamUrl={streamUrl}
-              title={`${seriesData.title} - ${activeEpisode?.title}`}
-              initialTime={resumeTime}
-              onProgressUpdate={handleProgressUpdate}
-              onNextEpisode={onNextEpisode}
-              onPrevEpisode={onPrevEpisode}
-              hasNext={hasNext}
-              hasPrev={hasPrev}
-            />
-          ) : (
-            <div className="w-full aspect-video bg-[#13141b] rounded-xl sm:rounded-2xl border border-white/10 flex items-center justify-center text-xs text-zinc-400">
-              Oynatılacak akış seçilmedi.
-            </div>
-          )}
+          {/* 16:9 Gömülü Video Oynatıcı (Mobilde kenardan kenara tam genişlik) */}
+          <div className="w-full">
+            {isLoadingStream ? (
+              <div className="w-full aspect-video bg-[#13141b] rounded-none sm:rounded-2xl border-0 sm:border border-white/10 flex flex-col items-center justify-center gap-3">
+                <div className="loader-spin" style={{ width: 28, height: 28, borderWidth: 3 }}></div>
+                <p className="text-xs text-zinc-400 font-medium">Bölüm akışı hazırlanıyor, lütfen bekleyin...</p>
+              </div>
+            ) : streamUrl ? (
+              <CustomPlayer
+                streamUrl={streamUrl}
+                title={`${seriesData.title} - ${activeEpisode?.title}`}
+                initialTime={resumeTime}
+                onProgressUpdate={handleProgressUpdate}
+                onNextEpisode={onNextEpisode}
+                onPrevEpisode={onPrevEpisode}
+                hasNext={hasNext}
+                hasPrev={hasPrev}
+              />
+            ) : (
+              <div className="w-full aspect-video bg-[#13141b] rounded-none sm:rounded-2xl border-0 sm:border border-white/10 flex items-center justify-center text-xs text-zinc-400">
+                Oynatılacak akış seçilmedi.
+              </div>
+            )}
+          </div>
 
           {/* Video Altı Başlık ve Bilgiler */}
-          <div className="p-3.5 sm:p-4 bg-[#13141b] border border-white/10 rounded-xl">
+          <div className="mx-3 sm:mx-0 p-3.5 sm:p-4 bg-[#13141b] border border-white/10 rounded-xl">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2.5 mb-2.5">
               <div>
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded border border-white/5 mb-1 inline-block">
@@ -168,7 +170,7 @@ export default function WatchDetailsView({
         </div>
 
         {/* SAĞ YAN ALAN: Sezonlar ve Bölüm Listesi (4 Kolon - YouTube Playlist Tarzı) */}
-        <div className="lg:col-span-4 bg-[#13141b] border border-white/10 rounded-xl p-3 sm:p-3.5 flex flex-col gap-3">
+        <div className="mx-3 sm:mx-0 lg:col-span-4 bg-[#13141b] border border-white/10 rounded-xl p-3 sm:p-3.5 flex flex-col gap-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Tv size={14} /> Bölüm Listesi

@@ -32,7 +32,6 @@ function WatchContent() {
           if (data.success && data.seasons?.length > 0) {
             setSeriesData(data);
 
-            // Hedeflenen bölümü bul veya ilk bölümü seç
             let chosenEp = null;
             let chosenSeasonIdx = 0;
             let chosenEpIdx = 0;
@@ -119,7 +118,7 @@ function WatchContent() {
 
   if (loading && !seriesData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 px-4">
         <div className="loader-spin" style={{ width: 32, height: 32, borderWidth: 3 }}></div>
         <p className="text-xs text-zinc-400">llofth player yükleniyor...</p>
       </div>
@@ -128,7 +127,7 @@ function WatchContent() {
 
   if (error && !seriesData) {
     return (
-      <div className="max-w-md mx-auto my-16 p-6 bg-[#13141b] border border-white/10 rounded-xl text-center">
+      <div className="max-w-md mx-auto my-12 p-5 sm:p-6 bg-[#13141b] border border-white/10 rounded-xl text-center mx-4 sm:mx-auto">
         <h2 className="text-sm font-bold text-red-400 mb-2">Akış Başlatılamadı</h2>
         <p className="text-xs text-zinc-400 mb-4">{error}</p>
         <button
@@ -146,7 +145,7 @@ function WatchContent() {
   const hasPrev = currentSeason && currentEpIdx > 0;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <div className="p-0 sm:p-4 md:p-8 max-w-7xl mx-auto w-full min-w-0">
       <WatchDetailsView
         seriesData={seriesData}
         activeEpisode={activeEpisode}

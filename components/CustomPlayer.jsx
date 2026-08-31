@@ -16,7 +16,7 @@ import {
   Radio,
   Sliders,
   Check,
-  RotateCcw as ResumeIcon
+  X
 } from 'lucide-react';
 
 export default function CustomPlayer({
@@ -269,7 +269,7 @@ export default function CustomPlayer({
     if (!video || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
-    video.currentTime = pos * duration;
+    video.currentTime = Math.max(0, Math.min(duration, pos * duration));
   };
 
   const toggleMute = () => {
@@ -342,9 +342,12 @@ export default function CustomPlayer({
   return (
     <div
       ref={containerRef}
+      onClick={showControlsTemporarily}
       onMouseMove={showControlsTemporarily}
       className={`relative w-full aspect-video bg-black overflow-hidden select-none font-sans ${
-        isFullscreen ? 'fixed inset-0 w-screen h-screen z-[99999]' : 'rounded-2xl border border-white/10 shadow-2xl'
+        isFullscreen
+          ? 'fixed inset-0 w-screen h-screen z-[99999] rounded-none border-0'
+          : 'rounded-none sm:rounded-2xl border-0 sm:border border-white/10 shadow-2xl'
       }`}
     >
       {/* Video Element */}
@@ -357,34 +360,65 @@ export default function CustomPlayer({
 
       {/* Kaldığı Yerden Devam Bildirimi */}
       {resumeNotification && (
-        <div className="absolute top-4 left-4 z-40 px-3.5 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-top duration-300">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-40 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg bg-black/85 backdrop-blur-md border border-white/20 text-white text-[10px] sm:text-xs font-semibold flex items-center gap-2 shadow-lg">
+          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span>{resumeNotification}</span>
         </div>
       )}
 
-      {/* Kontroller Katmanı */}
+      {/* MOBİL VE DOKUNMATİK İÇİN ORTA EKRAN OYNAT/DURDUR/SARMA DÜĞMELERİ */}
       <div
-        className={`absolute inset-0 flex flex-col justify-between p-4 md:p-6 bg-gradient-to-t from-black/90 via-transparent to-black/60 transition-opacity duration-200 pointer-events-none ${
+        className={`absolute inset-0 flex items-center justify-center gap-6 sm:gap-10 transition-opacity duration-200 pointer-events-none ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Üst Bilgi */}
+        <button
+          onClick={(e) => { e.stopPropagation(); seek(-10); }}
+          className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
+          title="10sn Geri"
+        >
+          <RotateCcw size={20} className="sm:w-6 sm:h-6" />
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+          className="p-3.5 sm:p-5 rounded-full bg-white text-black hover:bg-zinc-200 backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 shadow-2xl outline-none"
+          title={isPlaying ? 'Durdur' : 'Oynat'}
+        >
+          {isPlaying ? <Pause size={24} className="sm:w-7 sm:h-7" /> : <Play size={24} className="sm:w-7 sm:h-7 ml-0.5" />}
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); seek(10); }}
+          className="p-2 sm:p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white backdrop-blur-sm pointer-events-auto transition-transform active:scale-90 outline-none"
+          title="10sn İleri"
+        >
+          <RotateCw size={20} className="sm:w-6 sm:h-6" />
+        </button>
+      </div>
+
+      {/* Kontroller Katmanı (Üst & Alt Barlar) */}
+      <div
+        className={`absolute inset-0 flex flex-col justify-between p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/90 via-transparent to-black/70 transition-opacity duration-200 pointer-events-none ${
+          showControls ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {/* ÜST BİLGİ ÇUBUĞU */}
         <div className="flex justify-between items-center pointer-events-auto">
-          <span className="text-xs font-semibold text-white/90 truncate max-w-lg">
+          <span className="text-[11px] sm:text-xs font-semibold text-white/90 truncate max-w-[200px] sm:max-w-md">
             {title}
           </span>
-          <span className="text-[11px] font-mono text-zinc-400 bg-black/50 px-2 py-0.5 rounded border border-white/10">
-            HLS • 1080p
+          <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400 bg-black/60 px-2 py-0.5 rounded border border-white/10 flex-shrink-0 ml-2">
+            HLS 1080p
           </span>
         </div>
 
-        {/* Alt Kontrol Araç Çubuğu */}
-        <div className="flex flex-col gap-2.5 pointer-events-auto">
-          {/* İlerleme Çubuğu */}
+        {/* ALT KONTROL VE İLERLEME ÇUBUĞU */}
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          {/* İlerleme Çubuğu (Scrubber) */}
           <div
             onClick={handleScrub}
-            className="relative w-full h-1.5 hover:h-2.5 bg-white/20 rounded-full cursor-pointer transition-all flex items-center"
+            className="relative w-full h-2 hover:h-3 bg-white/20 rounded-full cursor-pointer transition-all flex items-center"
           >
             <div
               style={{ width: `${bufferedPercent}%` }}
@@ -396,39 +430,24 @@ export default function CustomPlayer({
             />
           </div>
 
+          {/* Alt Kontrol Butonları */}
           <div className="flex justify-between items-center text-white">
-            <div className="flex items-center gap-2">
+            {/* Sol: Oynat/Durdur & Süre */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={togglePlay}
                 tabIndex={101}
                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors outline-none"
               >
-                {isPlaying ? <Pause size={17} /> : <Play size={17} className="ml-0.5" />}
+                {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
               </button>
 
-              <button
-                onClick={() => seek(-10)}
-                tabIndex={102}
-                className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors outline-none"
-                title="10sn Geri"
-              >
-                <RotateCcw size={16} />
-              </button>
-
-              <button
-                onClick={() => seek(10)}
-                tabIndex={103}
-                className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors outline-none"
-                title="10sn İleri"
-              >
-                <RotateCw size={16} />
-              </button>
-
+              {/* Masaüstünde Önceki/Sonraki Butonları */}
               {hasPrev && (
                 <button
                   onClick={onPrevEpisode}
                   tabIndex={104}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
+                  className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
                 >
                   <SkipBack size={13} /> Önceki
                 </button>
@@ -438,20 +457,20 @@ export default function CustomPlayer({
                 <button
                   onClick={onNextEpisode}
                   tabIndex={105}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
+                  className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded bg-white/5 hover:bg-white/15 text-xs text-zinc-300 hover:text-white transition-colors outline-none"
                 >
                   Sonraki <SkipForward size={13} />
                 </button>
               )}
 
-              {/* Ses */}
-              <div className="flex items-center gap-1.5 ml-1">
+              {/* Ses Kaydırıcı (Masaüstünde gösterilir, mobilde yer tasarrufu için gizlenir) */}
+              <div className="hidden sm:flex items-center gap-1.5 ml-1">
                 <button
                   onClick={toggleMute}
                   tabIndex={106}
-                  className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white outline-none"
+                  className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white outline-none"
                 >
-                  {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  {isMuted || volume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
                 </button>
                 <input
                   type="range"
@@ -461,23 +480,24 @@ export default function CustomPlayer({
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
                   tabIndex={107}
-                  className="w-14 h-1 bg-white/30 rounded accent-white cursor-pointer"
+                  className="w-12 md:w-16 h-1 bg-white/30 rounded accent-white cursor-pointer"
                 />
               </div>
 
-              <div className="text-xs font-mono text-zinc-400 ml-1">
+              {/* Süre Göstergesi */}
+              <div className="text-[11px] sm:text-xs font-mono text-zinc-400 ml-1">
                 <span className="text-zinc-200">{formatTime(currentTime)}</span>
                 <span className="mx-1 text-zinc-600">/</span>
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
 
-            {/* Sağ Ayarlar & Tam Ekran */}
-            <div className="flex items-center gap-2 relative">
+            {/* Sağ: Ses Dili / Kalite Ayarları & Tam Ekran */}
+            <div className="flex items-center gap-1.5 sm:gap-2 relative">
               <button
                 onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                 tabIndex={108}
-                className={`p-1.5 rounded-lg transition-colors outline-none ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors outline-none ${
                   showSettingsMenu ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20 text-zinc-300'
                 }`}
                 title="Ses Dili & Kalite"
@@ -488,31 +508,34 @@ export default function CustomPlayer({
               <button
                 onClick={toggleNativeFullscreen}
                 tabIndex={109}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-200 hover:text-white transition-colors outline-none"
-                title={isFullscreen ? 'Tam Ekrandan Çık (ESC)' : 'Tam Ekran Yap (F)'}
+                className="p-1.5 sm:p-2 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-200 hover:text-white transition-colors outline-none"
+                title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}
               >
                 {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
               </button>
 
-              {/* Ayarlar Açılır Penceresi */}
+              {/* Ayarlar Açılır Menüsü */}
               {showSettingsMenu && (
-                <div className="absolute bottom-11 right-0 w-60 bg-[#14151e] border border-white/15 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-50">
+                <div className="absolute bottom-11 right-0 w-56 sm:w-60 bg-[#14151e] border border-white/20 rounded-xl p-2 shadow-2xl flex flex-col gap-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                   {activeSettingsTab === 'main' && (
                     <>
-                      <div className="px-2 py-1 text-[11px] font-semibold text-zinc-400 border-b border-white/10 pb-1">
-                        Seçenekler
+                      <div className="flex items-center justify-between px-2 py-1 border-b border-white/10 pb-1">
+                        <span className="text-[11px] font-semibold text-zinc-400">Seçenekler</span>
+                        <button onClick={() => setShowSettingsMenu(false)} className="text-zinc-400 hover:text-white p-0.5">
+                          <X size={13} />
+                        </button>
                       </div>
 
                       <button
                         onClick={() => setActiveSettingsTab('audio')}
                         tabIndex={110}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 text-left"
+                        className="flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 text-left"
                       >
                         <div className="flex items-center gap-2">
                           <Radio size={13} />
                           <span>Ses Dili</span>
                         </div>
-                        <span className="text-[11px] text-zinc-400">
+                        <span className="text-[11px] text-zinc-400 truncate max-w-[90px]">
                           {audioTracks[selectedAudio]?.name || 'Varsayılan'} ▶
                         </span>
                       </button>
@@ -520,7 +543,7 @@ export default function CustomPlayer({
                       <button
                         onClick={() => setActiveSettingsTab('quality')}
                         tabIndex={111}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 text-left"
+                        className="flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-white/10 text-xs font-medium text-zinc-200 text-left"
                       >
                         <div className="flex items-center gap-2">
                           <Sliders size={13} />
