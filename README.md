@@ -1,52 +1,110 @@
-# llofth • Yerel Medya Ağ Geçidi & Akış Oynatıcı
+# llofth • Yerel Medya Ağ Geçidi & Akış Portalı
 
-Smart TV ve D-Pad kumanda odaklı, **Next.js 14 (App Router)** ve **HLS.js** tabanlı yerel medya portalı ve akış ağ geçidi.
-
----
-
-## 🌟 Temel Özellikler
-
-- **Yerel HLS Proxy & Segment Dönüştürücü:** `.jpg` maskeli HLS segmentlerini `video/mp2t` olarak borular, `master.m3u8` manifestlerini ve ses izlerini yeniden yazar.
-- **YouTube Tarzı İzleme Sayfası (`/watch`):** Sol tarafta 16:9 gömülü video oynatıcı, sağ tarafta sezon/bölüm çalma listesi.
-- **İzlemeye Devam Et (Continue Watching):** İzlenen bölümlerin ilerleme yüzdesini ve saniyesini kaydederek ana sayfada vitrin olarak sunar; tıklandığında kaldığı saniyeden otomatik başlatır.
-- **Gerçek Tam Ekran (Native Fullscreen):** `F` tuşu veya buton ile tarayıcı dahil cihazın tüm ekranını kaplar.
-- **Çift Ses Dili (Dual Audio):** Türkçe ve Orijinal İngilizce ses parçaları arasında anında geçiş.
-- **D-Pad Kumanda & Klavye Kontrolleri:** D-Pad ile gezinme, Space/OK ile duraklatma, ◀/▶ ile 10 sn sarma.
-- **Full HD Afiş Çözücü:** Orijinal yüksek çözünürlüklü WebP afişleri ile liste ve detay görselleri.
+Smart TV, Mobil (Telefon/Tablet) ve Masaüstü cihazlar için özel olarak tasarlanmış, **Next.js 14 (App Router)** ve **HLS.js** tabanlı yeni nesil yerel medya akış portalı.
 
 ---
 
-## 📂 Sayfa & Endpoint Rotaları
+## 🌟 Öne Çıkan Özellikler
 
-- **`/home`**: Ana sayfa, öne çıkan vitrin banner'ı, popüler içerikler ve "İzlemeye Devam Et" vitrini.
-- **`/search`**: Canlı arama sayfası (`?q=...` parametresi desteğiyle).
-- **`/watch`**: YouTube tarzı bölüm izleme ve çalma listesi sayfası (`?url=...&epUrl=...&t=...`).
+- 🎬 **YouTube Tarzı İki Kolonlu İzleme Sayfası (`/watch`):** Sol tarafta 16:9 gömülü video oynatıcı, sağ tarafta dikey sezon ve bölüm çalma listesi.
+- 📱 **Tam Mobil Uyumluluk (Mobile-First):** Telefonlarda ekranın altına sabitlenen modern alt menü çubuğu (Bottom Navigation Bar) ve kenardan kenara (Edge-to-Edge) tam oturan video oynatıcı.
+- ⏱️ **Kaldığın Yerden Devam Et (Continue Watching):** Yarım bıraktığınız bölümler ana sayfada vitrin olarak listelenir ve tıklandığında kaldığı tam saniyeden otomatik devam eder.
+- 📺 **Smart TV & D-Pad Kumanda Desteği:** TV kumandaları ve klavye ile tam uyumlu gezinme, odaklanma efektleri ve kısayollar.
+- 🔊 **Çift Ses Dili (Dual Audio):** Türkçe Dublaj ve Orijinal İngilizce ses kanalları arasında anında geçiş.
+- 🖼️ **Full HD Afiş Çözücü:** Orijinal yüksek çözünürlüklü WebP afişleri ile akıcı içerik ızgarası.
+- 🚀 **Yerel HLS Proxy & Segment Dönüştürücü:** `.jpg` maskeli HLS video parçalarını `video/mp2t` olarak borulayan akıllı proxy motoru.
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## 📋 Gereksinimler
 
-```powershell
-# Bağımlılıkları yükleyin
-npm install
+Projenin çalışması için bilgisayarınızda şunların kurulu olması yeterlidir:
+- **Node.js** (v18.17.0 veya daha yeni bir sürüm) -> [nodejs.org](https://nodejs.org/)
+- **Git** -> [git-scm.com](https://git-scm.com/)
 
-# Geliştirici modunda başlatın
-npm run dev
+---
 
-# veya Üretim modunda derleyip başlatın
-npm run build
-npm start
+## 🛠️ Sıfırdan Kurulum ve Çalıştırma Rehberi
+
+Projeyi GitHub'dan indirip çalıştırmak için terminalinizde (Komut İstemi veya PowerShell) aşağıdaki adımları sırasıyla uygulayın:
+
+### 1. Depoyu Klonlayın (İndirin)
+```bash
+git clone https://github.com/Bedirhan3428/llofth.git
 ```
 
-Tarayıcınızdan veya Smart TV'den erişin:
-- **Bilgisayarda:** `http://localhost:3000`
-- **Smart TV / Ağdaki Cihazlarda:** `http://192.168.1.13:3000`
+### 2. Proje Klasörüne Girin
+```bash
+cd llofth
+```
+
+### 3. Bağımlılıkları Yükleyin
+```bash
+npm install
+```
+
+### 4. Projeyi Derleyin (Üretim Modu)
+```bash
+npm run build
+```
+
+### 5. Sunucuyu Başlatın
+```bash
+npm start
+```
+*(Geliştirme modunda anlık kod değişiklikleri ile çalıştırmak isterseniz: `npm run dev`)*
 
 ---
 
-## 🛠️ Teknoloji Yığını
+## 🌐 Yayına Erişim Adresleri
 
-- **Framework:** Next.js 14 (App Router), React 18
-- **Styling:** Tailwind CSS (Koyu minimalist tema)
-- **Player:** Custom HTML5 + HLS.js Video Engine
-- **Scraper & Parser:** Cheerio, Node.js VM Context, Axios
+Sunucu başarıyla başladığında terminalde şu çıktıyı göreceksiniz:
+```text
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:23504
+  - Network:      http://0.0.0.0:23504
+```
+
+### 💻 Bilgisayarınızdan İzlemek İçin:
+Tarayıcınızda açın:
+👉 **[`http://localhost:23504`](http://localhost:23504)**
+
+---
+
+### 📺 Smart TV, Telefon veya Tabletten İzlemek İçin:
+1. Telefonunuzun veya Smart TV'nizin bilgisayarınızla **aynı Wi-Fi ağına** bağlı olduğundan emin olun.
+2. Bilgisayarınızın yerel IP adresini öğrenin:
+   - **Windows:** Terminalde `ipconfig` yazın -> `IPv4 Address` değerine bakın (Örn: `192.168.1.13`).
+   - **Mac / Linux:** Terminalde `ifconfig` veya `ip a` yazın.
+3. TV veya telefonunuzun tarayıcısını açıp şu adrese girin:
+   👉 **`http://<BILGISAYAR_IP_ADRESINIZ>:23504`**  
+   *(Örnek: `http://192.168.1.13:23504`)*
+
+---
+
+## ⌨️ Klavye ve Smart TV Kumanda Kısayolları
+
+| Tuş | Eylem |
+|---|---|
+| **`Space` / `K` / `OK Tuşu`** | Videoyu Oynat / Duraklat |
+| **`▶ Sağ Ok`** | 10 Saniye İleri Sar |
+| **`◀ Sol Ok`** | 10 Saniye Geri Sar |
+| **`▲ Yukarı Ok`** | Sesi Aç (+10%) |
+| **`▼ Aşağı Ok`** | Sesi Kıs (-10%) |
+| **`F`** | Gerçek Tam Ekran (Tarayıcıyı kaplar) |
+| **`M`** | Sesi Kapat / Aç (Mute) |
+| **`N`** | Sonraki Bölüme Geç |
+| **`P`** | Önceki Bölüme Geç |
+
+---
+
+## 📁 Sayfa ve Rota Mimarisi
+
+- **`/home`**: Ana sayfa, öne çıkan vitrin banner'ı, popüler içerikler ve "İzlemeye Devam Et" vitrini.
+- **`/search`**: Canlı arama sayfası (`?q=...` desteğiyle).
+- **`/watch`**: YouTube tarzı video ve bölüm oynatıcı (`?url=...&epUrl=...&t=...`).
+
+---
+
+## 📄 Lisans
+MIT License.
