@@ -16,13 +16,21 @@ export default function ContinueWatching() {
 
   useEffect(() => {
     loadHistory();
+    window.addEventListener('focus', loadHistory);
+    window.addEventListener('storage', loadHistory);
+    return () => {
+      window.removeEventListener('focus', loadHistory);
+      window.removeEventListener('storage', loadHistory);
+    };
   }, []);
 
   if (historyItems.length === 0) return null;
 
   const handleResume = (item) => {
+    const epUrl = item.lastEpisodeUrl || item.episodeUrl;
+    const time = item.currentTime || 0;
     router.push(
-      `/watch?url=${encodeURIComponent(item.seriesUrl)}&epUrl=${encodeURIComponent(item.episodeUrl)}&t=${item.currentTime}`
+      `/watch?url=${encodeURIComponent(item.seriesUrl)}&epUrl=${encodeURIComponent(epUrl)}&t=${time}`
     );
   };
 
@@ -62,8 +70,9 @@ export default function ContinueWatching() {
             {/* Top Thumbnail with Progress Overlay */}
             <div className="relative w-full aspect-video bg-zinc-900 overflow-hidden">
               <img
-                src={item.poster || 'https://via.placeholder.com/400x225/181922/ffffff?text=Video'}
+                src={item.poster || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="100%" height="100%" fill="%23181922"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23666" font-family="sans-serif" font-size="14">llofth</text></svg>'}
                 alt={item.seriesTitle}
+                onError={(e) => { e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="100%" height="100%" fill="%23181922"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23666" font-family="sans-serif" font-size="14">llofth</text></svg>'; }}
                 className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
               />
 

@@ -32,7 +32,7 @@ export default function SearchResults({ results, query, onSelectResult, isLoadin
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {results && results.length > 0 ? (
             results.map((item, index) => {
-              const fallbackPoster = 'https://via.placeholder.com/50x70/1a1c28/ffffff?text=Resim';
+              const fallbackPoster = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="70" viewBox="0 0 50 70"><rect width="100%" height="100%" fill="%23181922"/></svg>';
               return (
                 <button
                   key={`${item.url}-${index}`}

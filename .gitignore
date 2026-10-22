@@ -16,10 +16,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Local Cache & Temp data
-data/cache/*.json
+data/cache/**
 !data/cache/.gitkeep
 .tempmediaStorage/
 scratch/
+sinric-config.json
 
 # Environment Variables & OS files
 .env*.local

@@ -25,7 +25,7 @@ export async function GET(request) {
       }
     });
   } catch (err) {
-    console.error('[API Playlist Proxy Hata]:', err.message);
+    console.error(`[API Playlist Proxy Hata - ${playlistUrl}]:`, err.message);
     return NextResponse.json(
       { error: `Playlist proxy hatası: ${err.message}` },
       { status: 500 }

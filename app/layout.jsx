@@ -1,5 +1,6 @@
 import './globals.css';
 import Sidebar from '@/components/Sidebar';
+import RemoteListener from '@/components/RemoteListener';
 
 export const metadata = {
   title: 'llofth • Yerel Medya Portalı',
@@ -16,6 +17,9 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-[#0b0c10] text-[#f0f0f5] min-h-screen antialiased selection:bg-white/20 selection:text-white">
+        {/* Canlı Sesli Asistan & Kumanda Alıcısı */}
+        <RemoteListener />
+
         <div className="flex min-h-screen flex-col md:flex-row">
           {/* Global Sidebar & Mobile Bottom Navigation */}
           <Sidebar />

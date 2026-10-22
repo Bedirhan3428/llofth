@@ -1,0 +1,7 @@
+{
+  "appKey": "YOUR_SINRIC_APP_KEY",
+  "appSecret": "YOUR_SINRIC_APP_SECRET",
+  "deviceId": "YOUR_SINRIC_DEVICE_ID",
+  "mentalistDeviceId": "OPTIONAL_SINRIC_DEVICE_ID",
+  "targetTvId": "SALON"
+}

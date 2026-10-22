@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Compass, Tv, Film } from 'lucide-react';
+import { Home, Search, Compass, Tv, Film, Smartphone } from 'lucide-react';
 
 export default function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -14,6 +14,7 @@ export default function Sidebar() {
     { href: '/search', label: 'Arama', icon: Search, tabIndex: 2 },
     { href: '/search?q=Dune', label: 'Popüler', icon: Compass, tabIndex: 3 },
     { href: '/search?q=Breaking%20Bad', label: 'Diziler', icon: Tv, tabIndex: 4 },
+    { href: '/remote', label: 'Kumanda', icon: Smartphone, tabIndex: 5 },
   ];
 
   return (

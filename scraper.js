@@ -255,34 +255,103 @@ async function resolveStreamUrl(pageUrl) {
 
   let rawM3u8 = null;
 
+  // 1. İframe içindeki JavaScript kodlarını birleşik VM sanal alanında çalıştır
+  let combinedScript = '';
   $iframe('script').each((i, el) => {
+    const type = $iframe(el).attr('type') || '';
     const text = $iframe(el).html() || '';
-    if (text.includes('function dc_') || text.includes('var s_') || text.includes('jwplayer')) {
-      const decoded = extractStreamFromScript(text);
-      if (decoded && (decoded.includes('/hls/') || decoded.includes('.m3u8') || decoded.includes('.txt'))) {
-        rawM3u8 = decoded;
-        return false;
-      }
-    }
+    if (type.includes('json') || text.trim().startsWith('{')) return;
+    if (text.includes('google') || text.includes('gtag') || text.includes('eval(function(p,a,c,k,e,d)')) return;
+    combinedScript += text + '\n';
   });
 
-  if (!rawM3u8) {
-    $iframe('script[type="application/ld+json"]').each((i, el) => {
-      try {
-        const json = JSON.parse($iframe(el).html());
-        if (json.contentUrl && (json.contentUrl.includes('.m3u8') || json.contentUrl.includes('.txt') || json.contentUrl.includes('/hls/'))) {
-          rawM3u8 = json.contentUrl;
-          return false;
-        }
-      } catch (e) {}
-    });
+  let parsedIframeUrl = {};
+  try {
+    parsedIframeUrl = new URL(absoluteIframeUrl);
+  } catch (e) {
+    parsedIframeUrl = { hostname: 'hdfilmcehennemi.mobi', host: 'hdfilmcehennemi.mobi', origin: 'https://hdfilmcehennemi.mobi', pathname: '/', protocol: 'https:', search: '' };
   }
 
+  const mockLocation = {
+    href: absoluteIframeUrl,
+    hostname: parsedIframeUrl.hostname || 'hdfilmcehennemi.mobi',
+    host: parsedIframeUrl.host || 'hdfilmcehennemi.mobi',
+    origin: parsedIframeUrl.origin || 'https://hdfilmcehennemi.mobi',
+    pathname: parsedIframeUrl.pathname || '/',
+    protocol: parsedIframeUrl.protocol || 'https:',
+    search: parsedIframeUrl.search || ''
+  };
+
+  const sandbox = {
+    atob: (str) => Buffer.from(str, 'base64').toString('binary'),
+    btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
+    Math: Math,
+    String: String,
+    Array: Array,
+    Object: Object,
+    RegExp: RegExp,
+    parseInt: parseInt,
+    parseFloat: parseFloat,
+    decodeURIComponent: decodeURIComponent,
+    encodeURIComponent: encodeURIComponent,
+    location: mockLocation,
+    navigator: {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    },
+    document: {
+      readyState: 'complete',
+      location: mockLocation,
+      getElementById: () => ({ style: {} }),
+      querySelector: () => null,
+      querySelectorAll: () => []
+    },
+    jwplayer: function() {
+      return {
+        setup: function(cfg) {
+          if (cfg && cfg.sources && Array.isArray(cfg.sources)) {
+            for (const s of cfg.sources) {
+              if (s && s.file && typeof s.file === 'string' && (s.file.includes('.m3u8') || s.file.includes('.txt') || s.file.includes('/hls/'))) {
+                rawM3u8 = s.file;
+                break;
+              }
+            }
+          }
+        },
+        on: () => {},
+        addButton: () => {}
+      };
+    }
+  };
+
+  sandbox.window = sandbox;
+  sandbox.self = sandbox;
+  sandbox.top = sandbox;
+  sandbox.parent = sandbox;
+  sandbox.globalThis = sandbox;
+
+  try {
+    const context = vm.createContext(sandbox);
+    vm.runInContext(combinedScript, context, { timeout: 3000 });
+
+    if (!rawM3u8) {
+      for (const key of Object.keys(sandbox)) {
+        const val = sandbox[key];
+        if (typeof val === 'string' && (val.includes('.m3u8') || val.includes('.txt') || val.includes('/hls/'))) {
+          if (!val.includes('playmix.uno')) {
+            rawM3u8 = val;
+            break;
+          }
+        }
+      }
+    }
+  } catch (err) {}
+
+  // 2. Yedek Regex Çözücü
   if (!rawM3u8) {
     const iframeMatches = iframeHtml.match(/https?:\/\/[^\s"'<>]+\.(m3u8|txt)[^\s"'<>]*/g);
     if (iframeMatches) {
       for (const m of iframeMatches) {
-        if (m.includes('/hls/') || m.includes('master') || m.includes('cdnimages')) {
+        if (!m.includes('playmix.uno') && (m.includes('/hls/') || m.includes('master') || m.includes('cdnimages'))) {
           rawM3u8 = m;
           break;
         }
@@ -294,13 +363,50 @@ async function resolveStreamUrl(pageUrl) {
     throw new Error('Oynatıcı kaynak kodlarından geçerli M3U8/HLS akış adresi sökülemedi.');
   }
 
-  streamCache.set(cacheKey, { rawM3u8, timestamp: Date.now() });
+  // Altyazı Parçalarını (VTT / SRT) Sök
+  let subtitles = [];
+  const tracksMatch = iframeHtml.match(/tracks\s*:\s*(\[[^\]]+\])/);
+  if (tracksMatch) {
+    try {
+      const parsedTracks = JSON.parse(tracksMatch[1]);
+      if (Array.isArray(parsedTracks)) {
+        subtitles = parsedTracks
+          .filter(t => t.file && (t.kind === 'captions' || t.kind === 'subtitles' || !t.kind))
+          .map(t => {
+            let label = t.label || 'Bilinmeyen';
+            const lower = label.toLowerCase();
+            if (lower === 'turkish') label = 'Türkçe';
+            else if (lower === 'english') label = 'İngilizce';
+            else if (lower === 'french') label = 'Fransızca';
+            else if (lower === 'spanish') label = 'İspanyolca';
+            else if (lower === 'german') label = 'Almanca';
+            else if (lower === 'portuguese') label = 'Portekizce';
+            else if (lower === 'italian') label = 'İtalyanca';
+            else if (lower === 'russian') label = 'Rusça';
+
+            const rawFile = t.file.replace(/\\\//g, '/');
+            return {
+              label,
+              rawUrl: rawFile,
+              url: `/api/proxy/subtitle?url=${encodeURIComponent(rawFile)}`,
+              default: !!t.default,
+              lang: label === 'Türkçe' ? 'tr' : (label === 'İngilizce' ? 'en' : 'und')
+            };
+          });
+      }
+    } catch (e) {
+      console.warn('Tracks parse error:', e.message);
+    }
+  }
+
+  streamCache.set(cacheKey, { rawM3u8, subtitles, timestamp: Date.now() });
 
   return {
     success: true,
     pageUrl: cleanUrl,
     rawM3u8: rawM3u8,
     streamUrl: `/playlist?url=${encodeURIComponent(rawM3u8)}`,
+    subtitles: subtitles,
     cached: false
   };
 }
