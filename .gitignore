@@ -21,6 +21,7 @@ data/cache/**
 .tempmediaStorage/
 scratch/
 sinric-config.json
+data/downloads/
 
 # Environment Variables & OS files
 .env*.local
@@ -28,3 +29,4 @@ sinric-config.json
 .DS_Store
 *.pem
 Thumbs.db
+data/downloads/

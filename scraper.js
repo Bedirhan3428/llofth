@@ -1,25 +1,30 @@
-const { execFile } = require('child_process');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const cheerio = require('cheerio');
+const { execFile } = require('child_process');
+const axios = require('axios');
 const vm = require('vm');
 
-// Önbellek Dizini
-const CACHE_DIR = path.join(__dirname, 'data', 'cache');
+// Vercel Serverless ortamında salt okunur dosya sistemi olduğu için /tmp kullanılır
+const CACHE_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'llofth_cache')
+  : path.join(process.cwd(), 'data', 'cache');
 
-// Bellek İçi Önbellek (RAM Cache)
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (e) {}
+
 const memoryCache = new Map();
 const streamCache = new Map();
-const searchCache = new Map();
 
-// Önbellek Süreleri (TTL)
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const STREAM_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
-const SEARCH_CACHE_TTL_MS = 1 * 60 * 60 * 1000; // Arama sonuçları için 1 saat
+function hashUrl(url) {
+  const cleanUrl = url.trim().toLowerCase().replace(/\/sezon-\d+\/bolum-\d+.*$/, '/');
+  return crypto.createHash('md5').update(cleanUrl).digest('hex');
+}
 
-// Zorunlu HTTP Başlıkları
 const DEFAULT_HEADERS = {
   'Referer': 'https://www.hdfilmcehennemi.nl/',
   'Origin': 'https://www.hdfilmcehennemi.nl',
@@ -28,26 +33,24 @@ const DEFAULT_HEADERS = {
   'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
 };
 
-async function ensureCacheDir() {
-  try {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
-  } catch (err) {}
-}
-
-function getCacheKey(url) {
-  const cleanUrl = url.trim().toLowerCase().replace(/\/sezon-\d+\/bolum-\d+.*$/, '/');
-  return crypto.createHash('md5').update(cleanUrl).digest('hex');
-}
+// Oynatıcı sunucusu iframe navigasyonu olmayan istekleri 404 ile reddediyor
+const IFRAME_FETCH_HEADERS = {
+  'Sec-Fetch-Dest': 'iframe',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'cross-site'
+};
 
 /**
- * Cloudflare ve TLS korumasını aşmak için optimize edilmiş HTTP isteği yapar.
+ * Cloudflare ve TLS korumasını aşan, hem Windows hem Linux/Vercel uyumlu HTTP isteği
  */
-function fetchHtml(url, referer = null, extraHeaders = {}) {
+function fetchHtmlWithCurl(targetUrl, referer = null, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     let origin = 'https://www.hdfilmcehennemi.nl';
     try {
-      origin = new URL(url).origin;
+      origin = new URL(targetUrl).origin;
     } catch (e) {}
+
+    const curlCmd = process.platform === 'win32' ? 'curl.exe' : 'curl';
 
     const args = [
       '-s', '-L',
@@ -63,24 +66,26 @@ function fetchHtml(url, referer = null, extraHeaders = {}) {
       args.push('-H', `${key}: ${value}`);
     }
 
-    args.push(url);
+    args.push(targetUrl);
 
-    execFile('curl.exe', args, { maxBuffer: 15 * 1024 * 1024 }, async (error, stdout) => {
-      if (!error && stdout && stdout.length > 5) {
+    execFile(curlCmd, args, { maxBuffer: 20 * 1024 * 1024 }, async (error, stdout) => {
+      if (!error && stdout && stdout.trim().length > 0) {
         return resolve(stdout);
       }
 
+      // Curl başarısız olursa Axios ile yedek istek yap (Vercel Serverless Fallback)
       try {
-        const res = await axios.get(url, {
+        const res = await axios.get(targetUrl, {
           headers: {
             ...DEFAULT_HEADERS,
             'Referer': referer || `${origin}/`,
             'Origin': origin,
             ...extraHeaders
           },
-          timeout: 12000
+          timeout: 10000
         });
-        resolve(typeof res.data === 'string' ? res.data : JSON.stringify(res.data));
+        const data = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+        resolve(data);
       } catch (axiosErr) {
         reject(new Error(`İstek başarısız: ${axiosErr.message}`));
       }
@@ -89,117 +94,261 @@ function fetchHtml(url, referer = null, extraHeaders = {}) {
 }
 
 /**
- * Site içi arama yapar ve yapılandırılmış dizi döner.
+ * HD ve Doğru Afiş Çıkarma Fonksiyonu
  */
-async function searchContent(query) {
-  if (!query || typeof query !== 'string' || !query.trim()) {
-    return [];
-  }
+function extractHdPoster($, cleanTitle, targetUrl) {
+  let poster = '';
+  const slug = targetUrl
+    .replace(/https?:\/\/[^\/]+\//, '')
+    .replace(/^dizi\//, '')
+    .split('/')[0]
+    .replace(/-\d+$/, '')
+    .replace(/\/$/, '');
 
-  const cleanQuery = query.trim();
-  const cacheKey = cleanQuery.toLowerCase();
+  $('img').each((_, el) => {
+    if (poster) return;
+    const src = $(el).attr('data-src') || $(el).attr('src') || '';
+    const alt = ($(el).attr('alt') || '').toLowerCase();
+    const titleLower = (cleanTitle || '').toLowerCase();
 
-  if (searchCache.has(cacheKey)) {
-    const cached = searchCache.get(cacheKey);
-    if (Date.now() - cached.timestamp < SEARCH_CACHE_TTL_MS) {
-      return cached.data;
+    if (src.includes('poster') || src.includes('cover')) {
+      if (!src.includes('/cast/') && !src.includes('/users/')) {
+        if ((titleLower && alt.includes(titleLower)) || (slug && src.includes(slug))) {
+          poster = src;
+        }
+      }
     }
-  }
-
-  const searchUrl = `https://www.hdfilmcehennemi.nl/search?q=${encodeURIComponent(cleanQuery)}`;
-  const rawOutput = await fetchHtml(searchUrl, 'https://www.hdfilmcehennemi.nl/', {
-    'X-Requested-With': 'fetch',
-    'Accept': 'application/json, text/plain, */*'
   });
 
-  let resultsHtmlArray = [];
+  if (!poster && slug) {
+    poster = `https://www.hdfilmcehennemi.nl/images/poster/${slug}.webp`;
+  }
+
+  if (poster) {
+    poster = poster
+      .replace('/images/thumb/poster/', '/images/poster/')
+      .replace('/images/list/poster/', '/images/poster/')
+      .replace('@2x', '');
+  }
+
+  return poster;
+}
+
+/**
+ * Site İçi Canlı Arama
+ */
+async function searchContent(query) {
+  if (!query || !query.trim()) return [];
+
+  const searchUrl = `https://www.hdfilmcehennemi.nl/search?q=${encodeURIComponent(query.trim())}`;
+  const stdout = await fetchHtmlWithCurl(searchUrl, 'https://www.hdfilmcehennemi.nl/', {
+    'X-Requested-With': 'fetch',
+    'Accept': 'application/json, text/javascript, */*; q=0.01'
+  });
+
+  let rawResults = [];
   try {
-    const parsedJson = JSON.parse(rawOutput);
-    if (parsedJson && Array.isArray(parsedJson.results)) {
-      resultsHtmlArray = parsedJson.results;
+    const json = JSON.parse(stdout);
+    if (Array.isArray(json.results)) {
+      rawResults = json.results;
     }
   } catch (e) {
-    // JSON parse edilemediyse HTML formatında ayrıştırmayı dene
-    const $ = cheerio.load(rawOutput);
+    const $ = cheerio.load(stdout);
     $('a.search-result, .search-results a').each((i, el) => {
-      resultsHtmlArray.push($.html(el));
+      rawResults.push($.html(el));
     });
   }
 
-  const items = [];
+  const results = [];
 
-  for (const htmlSnippet of resultsHtmlArray) {
-    const $ = cheerio.load(htmlSnippet);
-    const $a = $('a').first();
-    let url = $a.attr('href') || $('a.search-result').attr('href') || '';
-    if (!url) continue;
+  for (const itemHtml of rawResults) {
+    const $ = cheerio.load(itemHtml);
+    const aTag = $('a.search-result, a').first();
+    if (!aTag.length) continue;
 
-    if (!url.startsWith('http')) {
-      url = new URL(url, 'https://www.hdfilmcehennemi.nl').href;
+    const href = aTag.attr('href') || '';
+    const fullUrl = href.startsWith('http') ? href : `https://www.hdfilmcehennemi.nl${href}`;
+
+    const title = aTag.find('.title, .search-result-title, h4').first().text().trim() || aTag.text().trim();
+    const rawPoster = aTag.find('img').attr('data-src') || aTag.find('img').attr('src') || '';
+    
+    let poster = rawPoster;
+    if (poster) {
+      poster = poster
+        .replace('/images/thumb/poster/', '/images/poster/')
+        .replace('/images/list/poster/', '/images/poster/')
+        .replace('@2x', '');
     }
 
-    let title = $('.search-result-title, h4.title, h4, .title').first().text().trim();
-    let poster = $('img').attr('data-src') || $('img').attr('src') || '';
-    if (poster && !poster.startsWith('http')) {
-      poster = new URL(poster, 'https://www.hdfilmcehennemi.nl').href;
-    }
+    const year = aTag.find('.year, .search-result-year, time').first().text().trim();
+    const imdb = aTag.find('.imdb, .search-result-imdb, .rating, span.badge').first().text().trim();
+    const type = href.includes('/dizi/') ? 'Dizi' : 'Film';
 
-    const year = $('.year, .search-result-year, time').first().text().trim();
-    const imdb = $('.imdb, .search-result-imdb, .rating').first().text().trim();
-    let type = $('.type, .search-result-type, .badge').first().text().trim();
-    if (!type) {
-      type = url.includes('/dizi/') ? 'Dizi' : 'Film';
-    }
-
-    if (title) {
-      items.push({
-        title: title,
-        url: url,
-        poster: poster,
-        year: year,
-        imdb: imdb,
-        type: type,
-        rawHtml: htmlSnippet // Orijinal HTML yapısını frontend için de hazır bulundur
-      });
-    }
+    results.push({
+      title,
+      url: fullUrl,
+      poster,
+      year,
+      imdb,
+      type,
+      rawHtml: itemHtml
+    });
   }
 
-  searchCache.set(cacheKey, { data: items, timestamp: Date.now() });
-  return items;
+  return results;
 }
 
 /**
- * P.A.C.K.E.R. ve Obfuscated JS kodlarını VM içinde güvenle çözümler.
+ * Dizi, Sezon ve Bölüm Ağacını Çıkarma
  */
-function extractStreamFromScript(scriptContent) {
-  const sandbox = {
-    atob: (str) => Buffer.from(str, 'base64').toString('binary'),
-    btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
-    Math: Math,
-    String: String,
-    window: {},
-    document: { readyState: 'complete' }
+async function scrapeSeries(targetUrl, useCache = true) {
+  const cacheKey = hashUrl(targetUrl);
+  const cacheFilePath = path.join(CACHE_DIR, `${cacheKey}.json`);
+
+  if (useCache && memoryCache.has(cacheKey)) {
+    return { ...memoryCache.get(cacheKey), cached: true, cacheSource: 'memory' };
+  }
+
+  if (useCache && fs.existsSync(cacheFilePath)) {
+    try {
+      const fileData = fs.readFileSync(cacheFilePath, 'utf8');
+      const parsed = JSON.parse(fileData);
+      if (parsed && parsed.poster && !parsed.poster.includes('/thumb/') && !parsed.poster.includes('ncis') && !parsed.poster.includes('narcos')) {
+        memoryCache.set(cacheKey, parsed);
+        return { ...parsed, cached: true, cacheSource: 'file' };
+      }
+    } catch (err) {}
+  }
+
+  const html = await fetchHtmlWithCurl(targetUrl);
+  const $ = cheerio.load(html);
+
+  const rawH1 = $('h1.card-title, h1').first().text().trim();
+  const cleanTitle = rawH1.replace(/\s*\d+\.\s*Sezon.*$/i, '').trim() || $('meta[property="og:title"]').attr('content') || 'Bilinmeyen Dizi';
+
+  const poster = extractHdPoster($, cleanTitle, targetUrl);
+  const description = $('div.card-text, p.card-text, .overview, .synopsis, meta[name="description"]').first().text().trim() ||
+                      $('meta[property="og:description"]').attr('content') || '';
+
+  const seasons = [];
+  let totalEpisodes = 0;
+
+  const seasonTabContents = $('.seasons-tab-content');
+
+  if (seasonTabContents.length > 0) {
+    seasonTabContents.each((index, el) => {
+      const tabAttr = $(el).attr('data-tab');
+      const idAttr = $(el).attr('id');
+      let seasonNum = parseInt(tabAttr || (idAttr ? idAttr.replace('seasons-', '') : (index + 1)), 10);
+      if (isNaN(seasonNum)) seasonNum = index + 1;
+
+      const episodes = [];
+
+      $(el).find('a.mini-poster, .seasons-tab-item, .episode-item').each((j, epEl) => {
+        const epHref = $(epEl).attr('href') || $(epEl).find('a').attr('href') || '';
+        const epTitle = $(epEl).find('h4.mini-poster-title, a.card-title').text().trim() || $(epEl).text().trim();
+        const epDate = $(epEl).find('time.episode-date, span.card-date, span.date').text().trim();
+        let epImg = $(epEl).find('img').attr('data-src') || $(epEl).find('img').attr('src') || '';
+        if (epImg && !epImg.startsWith('http')) {
+          epImg = new URL(epImg, targetUrl).href;
+        }
+
+        let epNum = null;
+        const titleMatch = epTitle.match(/(\d+)\.\s*Bölüm/i);
+        if (titleMatch) {
+          epNum = parseInt(titleMatch[1], 10);
+        } else {
+          const urlMatch = epHref ? epHref.match(/bolum-(\d+)/i) : null;
+          if (urlMatch) epNum = parseInt(urlMatch[1], 10);
+          else epNum = j + 1;
+        }
+
+        const absoluteEpHref = epHref.startsWith('http') ? epHref : (epHref ? new URL(epHref, targetUrl).href : '');
+
+        episodes.push({
+          episodeNumber: epNum,
+          title: epTitle || `${seasonNum}. Sezon ${epNum}. Bölüm`,
+          url: absoluteEpHref,
+          date: epDate,
+          image: epImg
+        });
+      });
+
+      episodes.sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0));
+      totalEpisodes += episodes.length;
+
+      seasons.push({
+        seasonNumber: seasonNum,
+        seasonTitle: `${seasonNum}. Sezon`,
+        episodeCount: episodes.length,
+        episodes: episodes
+      });
+    });
+  }
+
+  // Fallback: JSON-LD
+  if (seasons.length === 0) {
+    $('script[type="application/ld+json"]').each((_, script) => {
+      try {
+        const text = $(script).html();
+        const json = JSON.parse(text);
+        if (json.containsSeason && Array.isArray(json.containsSeason)) {
+          json.containsSeason.forEach((s) => {
+            const seasonNum = parseInt(s.seasonNumber, 10) || 1;
+            const epList = [];
+            if (Array.isArray(s.episode)) {
+              s.episode.forEach((ep, idx) => {
+                epList.push({
+                  episodeNumber: parseInt(ep.episodeNumber, 10) || (idx + 1),
+                  title: ep.name || `${seasonNum}. Sezon ${idx + 1}. Bölüm`,
+                  url: ep.url || '',
+                  date: ep.datePublished ? ep.datePublished.split('T')[0] : ''
+                });
+              });
+            }
+            if (epList.length > 0) {
+              totalEpisodes += epList.length;
+              seasons.push({
+                seasonNumber: seasonNum,
+                seasonTitle: `${seasonNum}. Sezon`,
+                episodeCount: epList.length,
+                episodes: epList
+              });
+            }
+          });
+        }
+      } catch (e) {}
+    });
+  }
+
+  seasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+  const seriesData = {
+    success: true,
+    title: cleanTitle,
+    poster: poster,
+    description: description,
+    sourceUrl: targetUrl,
+    totalSeasons: seasons.length,
+    totalEpisodes: totalEpisodes,
+    seasons: seasons,
+    scrapedAt: new Date().toISOString()
   };
 
-  const context = vm.createContext(sandbox);
   try {
-    vm.runInContext(scriptContent, context, { timeout: 1000 });
-    for (const key of Object.keys(sandbox)) {
-      const val = sandbox[key];
-      if (typeof val === 'string' && (val.includes('.m3u8') || val.includes('.txt') || val.includes('/hls/'))) {
-        return val;
-      }
-    }
+    fs.writeFileSync(cacheFilePath, JSON.stringify(seriesData, null, 2), 'utf8');
+    memoryCache.set(cacheKey, seriesData);
   } catch (err) {}
-  return null;
+
+  return { ...seriesData, cached: false };
 }
 
 /**
- * Bölüm sayfasından veya gömülü Player iframe'inden ham M3U8/TXT stream linkini söker.
+ * Ham M3U8 Resolver
  */
 async function resolveStreamUrl(pageUrl) {
   if (!pageUrl || typeof pageUrl !== 'string') {
-    throw new Error('Geçerli bir pageUrl parametresi gereklidir.');
+    throw new Error('Geçerli bir pageUrl gereklidir.');
   }
 
   const cleanUrl = pageUrl.trim();
@@ -207,50 +356,64 @@ async function resolveStreamUrl(pageUrl) {
 
   if (streamCache.has(cacheKey)) {
     const cached = streamCache.get(cacheKey);
-    if (Date.now() - cached.timestamp < STREAM_CACHE_TTL_MS) {
+    if (Date.now() - cached.timestamp < 2 * 60 * 60 * 1000) {
       return {
         success: true,
         pageUrl: cleanUrl,
         rawM3u8: cached.rawM3u8,
-        streamUrl: `/playlist?url=${encodeURIComponent(cached.rawM3u8)}`,
+        streamUrl: `/api/proxy/playlist?url=${encodeURIComponent(cached.rawM3u8)}`,
+        subtitles: cached.subtitles || [],
         cached: true
       };
     }
   }
 
-  const pageHtml = await fetchHtml(cleanUrl);
-  const $page = cheerio.load(pageHtml);
+  let iframeHtml = '';
+  let absoluteIframeUrl = '';
 
-  const directMatch = pageHtml.match(/https?:\/\/[^\s"'<>]+\.(m3u8|txt)[^\s"'<>]*/);
-  if (directMatch && (directMatch[0].includes('/hls/') || directMatch[0].includes('master'))) {
-    const rawM3u8 = directMatch[0];
-    streamCache.set(cacheKey, { rawM3u8, timestamp: Date.now() });
-    return {
-      success: true,
-      pageUrl: cleanUrl,
-      rawM3u8: rawM3u8,
-      streamUrl: `/playlist?url=${encodeURIComponent(rawM3u8)}`,
-      cached: false
-    };
+  // Eğer doğrudan embed oynatıcı URL'i verildiyse bölüm sayfasını atlayıp direkt çöz
+  const isDirectEmbed = cleanUrl.includes('/video/embed/') || cleanUrl.includes('/rplayer/') || cleanUrl.includes('hdfilmcehennemi.mobi');
+
+  if (isDirectEmbed) {
+    absoluteIframeUrl = cleanUrl;
+    iframeHtml = await fetchHtmlWithCurl(absoluteIframeUrl, 'https://www.hdfilmcehennemi.nl/', IFRAME_FETCH_HEADERS);
+  } else {
+    const pageHtml = await fetchHtmlWithCurl(cleanUrl);
+    const $page = cheerio.load(pageHtml);
+
+    const directMatch = pageHtml.match(/https?:\/\/[^\s"'<>]+\.(m3u8|txt)[^\s"'<>]*/);
+    if (directMatch && (directMatch[0].includes('/hls/') || directMatch[0].includes('master'))) {
+      const rawM3u8 = directMatch[0];
+      streamCache.set(cacheKey, { rawM3u8, subtitles: [], timestamp: Date.now() });
+      return {
+        success: true,
+        pageUrl: cleanUrl,
+        rawM3u8: rawM3u8,
+        streamUrl: `/api/proxy/playlist?url=${encodeURIComponent(rawM3u8)}`,
+        subtitles: [],
+        cached: false
+      };
+    }
+
+    let iframeSrc = $page('iframe').attr('data-src') || $page('iframe').attr('src');
+    if (!iframeSrc) {
+      $page('[data-frame], [data-src], [data-embed]').each((i, el) => {
+        const src = $page(el).attr('data-frame') || $page(el).attr('data-src') || $page(el).attr('data-embed');
+        if (src && (src.includes('embed') || src.includes('video') || src.includes('player'))) {
+          iframeSrc = src;
+          return false;
+        }
+      });
+    }
+
+    if (!iframeSrc) {
+      throw new Error('Bölüm sayfasında oynatıcı iframe kaynağı bulunamadı.');
+    }
+
+    absoluteIframeUrl = new URL(iframeSrc, cleanUrl).href;
+    iframeHtml = await fetchHtmlWithCurl(absoluteIframeUrl, cleanUrl, IFRAME_FETCH_HEADERS);
   }
 
-  let iframeSrc = $page('iframe').attr('data-src') || $page('iframe').attr('src');
-  if (!iframeSrc) {
-    $page('[data-frame], [data-src], [data-embed]').each((i, el) => {
-      const src = $page(el).attr('data-frame') || $page(el).attr('data-src') || $page(el).attr('data-embed');
-      if (src && (src.includes('embed') || src.includes('video') || src.includes('player'))) {
-        iframeSrc = src;
-        return false;
-      }
-    });
-  }
-
-  if (!iframeSrc) {
-    throw new Error('Bölüm sayfasında oynatıcı iframe kaynağı bulunamadı.');
-  }
-
-  const absoluteIframeUrl = new URL(iframeSrc, cleanUrl).href;
-  const iframeHtml = await fetchHtml(absoluteIframeUrl, cleanUrl);
   const $iframe = cheerio.load(iframeHtml);
 
   let rawM3u8 = null;
@@ -260,8 +423,10 @@ async function resolveStreamUrl(pageUrl) {
   $iframe('script').each((i, el) => {
     const type = $iframe(el).attr('type') || '';
     const text = $iframe(el).html() || '';
+    // JSON-LD schema, tracking veya Cloudflare challenge scriptlerini atla
     if (type.includes('json') || text.trim().startsWith('{')) return;
     if (text.includes('google') || text.includes('gtag') || text.includes('eval(function(p,a,c,k,e,d)')) return;
+    if (text.includes('challenge-platform') || text.includes('__CF$cv$params') || text.includes('cloudflare')) return;
     combinedScript += text + '\n';
   });
 
@@ -280,6 +445,32 @@ async function resolveStreamUrl(pageUrl) {
     pathname: parsedIframeUrl.pathname || '/',
     protocol: parsedIframeUrl.protocol || 'https:',
     search: parsedIframeUrl.search || ''
+  };
+
+  // Oynatıcı betiği, çözme anahtarını DOM elementlerinin attributes / dataset değerlerinden türetiyor
+  const wrapNode = (el) => {
+    if (!el) return null;
+    const attribs = el.attribs || {};
+    const attrsProxy = {};
+    for (const [k, v] of Object.entries(attribs)) {
+      attrsProxy[k] = { value: v, name: k };
+    }
+    return {
+      tagName: String(el.tagName || 'DIV').toUpperCase(),
+      style: {},
+      getAttribute: (name) => attribs[name] ?? null,
+      setAttribute: (k, v) => { attribs[k] = v; },
+      attributes: attrsProxy,
+      innerHTML: $iframe(el).html() || ''
+    };
+  };
+
+  const emptyNode = {
+    tagName: 'DIV',
+    style: {},
+    getAttribute: () => '',
+    attributes: {},
+    innerHTML: ''
   };
 
   const sandbox = {
@@ -301,9 +492,20 @@ async function resolveStreamUrl(pageUrl) {
     document: {
       readyState: 'complete',
       location: mockLocation,
-      getElementById: () => ({ style: {} }),
-      querySelector: () => null,
-      querySelectorAll: () => []
+      getElementById: (id) => wrapNode($iframe('#' + id).get(0)) || emptyNode,
+      querySelector: (sel) => wrapNode($iframe(sel).get(0)) || emptyNode,
+      querySelectorAll: (sel) => $iframe(sel).toArray().map(wrapNode).filter(Boolean),
+      getElementsByTagName: (tag) => $iframe(tag).toArray().map(wrapNode).filter(Boolean),
+      createElement: (tag) => ({
+        tagName: String(tag || 'DIV').toUpperCase(),
+        style: {},
+        getAttribute: () => '',
+        attributes: {},
+        appendChild: () => {},
+        getContext: () => ({})
+      }),
+      head: { appendChild: () => {} },
+      body: { appendChild: () => {} }
     },
     jwplayer: function() {
       return {
@@ -346,7 +548,7 @@ async function resolveStreamUrl(pageUrl) {
     }
   } catch (err) {}
 
-  // 2. Yedek Regex Çözücü
+  // 2. Yedek Regex Çözücü (Yalnızca gerçek CDN linkleri için, sahte schema playmix.uno hariç)
   if (!rawM3u8) {
     const iframeMatches = iframeHtml.match(/https?:\/\/[^\s"'<>]+\.(m3u8|txt)[^\s"'<>]*/g);
     if (iframeMatches) {
@@ -359,8 +561,27 @@ async function resolveStreamUrl(pageUrl) {
     }
   }
 
+  // 3. Packer (eval(function(p,a,c,k,e,d)...)) ile paketlenmiş oynatıcı betiklerini aç.
+  // eval yakalanır, hiçbir şey çalıştırılmaz; yalnızca açılmış metin içinde CDN linki aranır.
   if (!rawM3u8) {
-    throw new Error('Oynatıcı kaynak kodlarından geçerli M3U8/HLS akış adresi sökülemedi.');
+    const packedRe = /eval\(function\(p,a,c,k,e,d\)[\s\S]*?\}\([\s\S]*?\)\)\s*(?:;|<\/script>|$)/g;
+    for (const packed of iframeHtml.match(packedRe) || []) {
+      const captured = [];
+      try {
+        const ctx = vm.createContext({ eval: (s) => { captured.push(String(s)); } });
+        vm.runInContext(packed, ctx, { timeout: 2000 });
+      } catch (e) {}
+      for (const unpacked of captured) {
+        const links = unpacked.replace(/\\\//g, '/').match(/https?:\/\/[^\s"'<>\\]+\.(m3u8|txt)[^\s"'<>\\]*/g) || [];
+        const hit = links.find(m => !m.includes('playmix.uno') && (m.includes('/hls/') || m.includes('master') || m.includes('cdnimages')));
+        if (hit) { rawM3u8 = hit; break; }
+      }
+      if (rawM3u8) break;
+    }
+  }
+
+  if (!rawM3u8) {
+    throw new Error('M3U8 akış adresi sökülemedi.');
   }
 
   // Altyazı Parçalarını (VTT / SRT) Sök
@@ -405,186 +626,30 @@ async function resolveStreamUrl(pageUrl) {
     success: true,
     pageUrl: cleanUrl,
     rawM3u8: rawM3u8,
-    streamUrl: `/playlist?url=${encodeURIComponent(rawM3u8)}`,
+    streamUrl: `/api/proxy/playlist?url=${encodeURIComponent(rawM3u8)}`,
     subtitles: subtitles,
     cached: false
   };
 }
 
-/**
- * Verilen dizi veya bölüm sayfasından tüm sezon ve bölümleri parse eder.
- */
-async function scrapeSeries(targetUrl, forceRefresh = false) {
-  if (!targetUrl || typeof targetUrl !== 'string') {
-    throw new Error('Geçerli bir URL sağlanmalıdır.');
-  }
-
-  await ensureCacheDir();
-  const cacheKey = getCacheKey(targetUrl);
-  const cacheFilePath = path.join(CACHE_DIR, `${cacheKey}.json`);
-
-  if (!forceRefresh && memoryCache.has(cacheKey)) {
-    const cached = memoryCache.get(cacheKey);
-    if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return { ...cached.data, cached: true, cacheSource: 'memory' };
-    }
-  }
-
-  if (!forceRefresh) {
-    try {
-      const fileData = await fs.readFile(cacheFilePath, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      if (Date.now() - new Date(parsed.scrapedAt).getTime() < CACHE_TTL_MS) {
-        memoryCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
-        return { ...parsed, cached: true, cacheSource: 'file' };
-      }
-    } catch (e) {}
-  }
-
-  const html = await fetchHtml(targetUrl);
-  const $ = cheerio.load(html);
-
-  const rawH1 = $('h1.card-title, h1').first().text().trim();
-  const cleanTitle = rawH1.replace(/\s*\d+\.\s*Sezon.*$/i, '').trim() || $('meta[property="og:title"]').attr('content') || 'Bilinmeyen Dizi';
-
-  let poster = $('img.card-img, .poster img, .cover-img, img[alt*="' + cleanTitle + '"]').first().attr('data-src') || 
-               $('img.card-img, .poster img, .cover-img, img[alt*="' + cleanTitle + '"]').first().attr('src') || '';
-  if (poster && !poster.startsWith('http')) {
-    poster = new URL(poster, targetUrl).href;
-  }
-
-  const description = $('p.card-text, .overview, .synopsis, meta[name="description"]').first().text().trim() || 
-                      $('meta[property="og:description"]').attr('content') || '';
-
-  const seasons = [];
-  let totalEpisodes = 0;
-
-  const seasonTabContents = $('.seasons-tab-content');
-
-  seasonTabContents.each((index, el) => {
-    const tabAttr = $(el).attr('data-tab');
-    const idAttr = $(el).attr('id');
-    let seasonNum = parseInt(tabAttr || (idAttr ? idAttr.replace('seasons-', '') : (index + 1)), 10);
-    if (isNaN(seasonNum)) seasonNum = index + 1;
-
-    const episodes = [];
-
-    $(el).find('a.mini-poster').each((j, epEl) => {
-      const epHref = $(epEl).attr('href');
-      const epTitle = $(epEl).find('h4.mini-poster-title').text().trim();
-      const epDate = $(epEl).find('time.episode-date').text().trim();
-      let epImg = $(epEl).find('img').attr('data-src') || $(epEl).find('img').attr('src') || '';
-      if (epImg && !epImg.startsWith('http')) {
-        epImg = new URL(epImg, targetUrl).href;
-      }
-
-      let epNum = null;
-      const titleMatch = epTitle.match(/(\d+)\.\s*Bölüm/i);
-      if (titleMatch) {
-        epNum = parseInt(titleMatch[1], 10);
-      } else {
-        const urlMatch = epHref ? epHref.match(/bolum-(\d+)/i) : null;
-        if (urlMatch) epNum = parseInt(urlMatch[1], 10);
-        else epNum = j + 1;
-      }
-
-      const absoluteEpHref = epHref ? new URL(epHref, targetUrl).href : '';
-
-      episodes.push({
-        episodeNumber: epNum,
-        title: epTitle || `${seasonNum}. Sezon ${epNum}. Bölüm`,
-        url: absoluteEpHref,
-        date: epDate,
-        image: epImg
-      });
-    });
-
-    episodes.sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0));
-    totalEpisodes += episodes.length;
-
-    seasons.push({
-      seasonNumber: seasonNum,
-      seasonTitle: `${seasonNum}. Sezon`,
-      episodeCount: episodes.length,
-      episodes: episodes
-    });
-  });
-
-  seasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
-
-  const seriesData = {
-    success: true,
-    title: cleanTitle,
-    poster: poster,
-    description: description,
-    sourceUrl: targetUrl,
-    totalSeasons: seasons.length,
-    totalEpisodes: totalEpisodes,
-    seasons: seasons,
-    scrapedAt: new Date().toISOString()
-  };
-
-  memoryCache.set(cacheKey, { data: seriesData, timestamp: Date.now() });
+function clearCache() {
+  memoryCache.clear();
+  streamCache.clear();
   try {
-    await fs.writeFile(cacheFilePath, JSON.stringify(seriesData, null, 2), 'utf-8');
-  } catch (err) {}
-
-  return { ...seriesData, cached: false };
-}
-
-async function clearCache(targetUrl = null) {
-  if (targetUrl) {
-    const key = getCacheKey(targetUrl);
-    memoryCache.delete(key);
-    try {
-      await fs.unlink(path.join(CACHE_DIR, `${key}.json`));
-    } catch (e) {}
-    return { success: true, message: 'Belirtilen dizi önbellekten silindi.' };
-  } else {
-    memoryCache.clear();
-    streamCache.clear();
-    searchCache.clear();
-    try {
-      const files = await fs.readdir(CACHE_DIR);
-      for (const f of files) {
-        if (f.endsWith('.json')) {
-          await fs.unlink(path.join(CACHE_DIR, f));
+    if (fs.existsSync(CACHE_DIR)) {
+      const files = fs.readdirSync(CACHE_DIR);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          fs.unlinkSync(path.join(CACHE_DIR, file));
         }
-      }
-    } catch (e) {}
-    return { success: true, message: 'Tüm önbellek temizlendi.' };
-  }
-}
-
-async function listCachedSeries() {
-  await ensureCacheDir();
-  const list = [];
-  try {
-    const files = await fs.readdir(CACHE_DIR);
-    for (const f of files) {
-      if (f.endsWith('.json')) {
-        try {
-          const content = await fs.readFile(path.join(CACHE_DIR, f), 'utf-8');
-          const data = JSON.parse(content);
-          list.push({
-            title: data.title,
-            poster: data.poster,
-            sourceUrl: data.sourceUrl,
-            totalSeasons: data.totalSeasons,
-            totalEpisodes: data.totalEpisodes,
-            scrapedAt: data.scrapedAt
-          });
-        } catch (e) {}
       }
     }
   } catch (e) {}
-  return list;
 }
 
 module.exports = {
   searchContent,
   scrapeSeries,
   resolveStreamUrl,
-  clearCache,
-  listCachedSeries
+  clearCache
 };

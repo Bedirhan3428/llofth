@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import CustomPlayer from '@/components/CustomPlayer';
 import { saveWatchProgress, getEpisodeProgress, getAllSeriesEpisodeProgress } from '@/lib/history';
-import { ArrowLeft, Calendar, Play, Tv, CheckCircle2, LayoutGrid, List, Star, Users, User } from 'lucide-react';
+import { ArrowLeft, Calendar, Play, Tv, CheckCircle2, LayoutGrid, List, Star, Users, User, Download } from 'lucide-react';
 
 export default function WatchDetailsView({
   seriesData,
@@ -27,6 +27,95 @@ export default function WatchDetailsView({
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
   const [tmdbData, setTmdbData] = useState(null);
   const [loadingTmdb, setLoadingTmdb] = useState(false);
+  const [download, setDownload] = useState(null);
+  const downloadPollRef = useRef(null);
+
+  const stopDownloadPoll = () => {
+    if (downloadPollRef.current) {
+      clearInterval(downloadPollRef.current);
+      downloadPollRef.current = null;
+    }
+  };
+
+  // Bölüm değişince indirme durumunu sıfırla
+  useEffect(() => {
+    stopDownloadPoll();
+    setDownload(null);
+    return stopDownloadPoll;
+  }, [activeEpisode?.url]);
+
+  const triggerFileDownload = (jobId) => {
+    const a = document.createElement('a');
+    a.href = `/api/download/file?id=${jobId}`;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const handleDownload = async () => {
+    if (!activeEpisode?.url) return;
+    if (download && !['error', 'delivered'].includes(download.status)) return;
+
+    const seriesName = (seriesData?.title || '').split(/[\r\n]+/)[0].replace(/\s*izle.*$/i, '').trim();
+    const seasonNo = seriesData?.seasons?.[currentSeasonIdx]?.seasonNumber || (currentSeasonIdx + 1);
+    const episodeNo = activeEpisode.episodeNumber || (currentEpIdx + 1);
+    const code = `S${String(seasonNo).padStart(2, '0')}E${String(episodeNo).padStart(2, '0')}`;
+    const title = seriesName ? `${seriesName} - ${code}` : (activeEpisode.title || code);
+
+    setDownload({ status: 'queued', progress: 0 });
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageUrl: activeEpisode.url, title })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      const episodeUrl = activeEpisode.url;
+      const applyJob = (job) => {
+        if (job.status === 'done' || job.status === 'error' || job.status === 'delivered') {
+          stopDownloadPoll();
+          if (job.status === 'done') {
+            triggerFileDownload(job.id);
+            setDownload({ ...job, status: 'delivered' });
+            return;
+          }
+        }
+        setDownload(job);
+      };
+
+      applyJob(data.job);
+      if (!['done', 'error', 'delivered'].includes(data.job.status)) {
+        stopDownloadPoll();
+        downloadPollRef.current = setInterval(async () => {
+          try {
+            const r = await fetch(`/api/download?id=${data.job.id}`);
+            const d = await r.json();
+            if (d.success && episodeUrl === activeEpisode.url) applyJob(d.job);
+          } catch (e) {}
+        }, 1000);
+      }
+    } catch (err) {
+      setDownload({ status: 'error', progress: 0, error: err.message });
+    }
+  };
+
+  const downloadLabel = (() => {
+    if (!download) return 'İndir';
+    switch (download.status) {
+      case 'queued': return 'Sırada';
+      case 'resolving': return 'Hazırlanıyor';
+      case 'downloading': return `%${download.progress}`;
+      case 'muxing': return 'Birleştiriliyor';
+      case 'done':
+      case 'delivered': return 'İndirildi';
+      case 'error': return 'İndirme başarısız';
+      default: return 'İndir';
+    }
+  })();
+  const isDownloading = download && !['done', 'delivered', 'error'].includes(download.status);
 
   useEffect(() => {
     if (!seriesData?.title) return;
@@ -195,6 +284,24 @@ export default function WatchDetailsView({
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start flex-shrink-0">
+                <button
+                  onClick={handleDownload}
+                  disabled={!!isDownloading}
+                  tabIndex={24}
+                  title={download?.error || (download?.quality ? download.quality : undefined)}
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center tabular-nums ${
+                    download?.status === 'error'
+                      ? 'bg-red-500/10 text-red-300 border-red-500/30 hover:bg-red-500/20'
+                      : 'bg-white/5 hover:bg-white/10 text-zinc-200 border-white/10'
+                  } ${isDownloading ? 'cursor-wait opacity-90' : ''}`}
+                >
+                  {isDownloading ? (
+                    <span className="loader-spin" style={{ width: 12, height: 12, borderWidth: 2 }}></span>
+                  ) : (
+                    <Download size={13} />
+                  )}
+                  <span>{downloadLabel}</span>
+                </button>
                 {hasPrev && (
                   <button
                     onClick={onPrevEpisode}
